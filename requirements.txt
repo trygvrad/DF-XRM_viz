@@ -1,0 +1,6 @@
+numpy==1.17.4
+streamlit==0.83.0
+matplotlib==3.4.2
+pandas==1.2.4
+Dans-Diffraction==1.9.2
+xraydb==4.4.7
