@@ -54,14 +54,37 @@ import sys, os
 import matplotlib.pyplot as plt
 import numpy as np
 
-
 uploaded_file = st.file_uploader("Upload a .cif file")
-if uploaded_file is not None:
-    with open(uploaded_file.name,"wb") as f:
-        f.write(uploaded_file.getbuffer())
-    cif_file = uploaded_file.name #'KNO 2310011.cif'
 
 
+known_crystal_structures = {
+    'Diamond':'http://www.crystallography.net/cod/9012290.cif',
+    'Aluminium':'http://www.crystallography.net/cod/9008460.cif',
+    'BaTiO3':'http://www.crystallography.net/cod/1507756.cif',
+    'KNbO3':'http://www.crystallography.net/cod/2310011.cif',
+    'LiNbO3':'http://www.crystallography.net/cod/1541936.cif',
+    'W':'http://www.crystallography.net/cod/9006486.cif',
+    'Pb':'http://www.crystallography.net/cod/1531228.cif',
+}
+import os.path
+import requests
+keys = ['Upload']+list(known_crystal_structures.keys())
+crystal = st.selectbox('Or select a crystal structure',
+        keys)
+
+if uploaded_file is not None or crystal != 'Upload':
+    if crystal == 'Upload':
+        with open('cif_files/'+uploaded_file.name,"wb") as f:
+            f.write(uploaded_file.getbuffer())
+        cif_file = 'cif_files/'+uploaded_file.name #'KNO 2310011.cif'
+        url = cif_file.split('/')[-1]
+    else:
+        url = known_crystal_structures[crystal]
+        cif_file = 'cif_files/'+url.split('/')[-1]
+        if not os.path.isfile(cif_file):
+            r = requests.get(url)
+            open(cif_file , 'wb').write(r.content)
+    st.write(f'Using {url}')
 
     # load standard parameters
     params = {}
