@@ -157,7 +157,7 @@ if uploaded_file is not None or crystal != 'Upload':
     cell_par = cell_par.replace('\n','').replace('AA','A\nA').split('\n')
     #cell_par = [','.join(cps[0:3]), ','.join(cps[3:])]
     st.write(cell_par[0].replace('A','Å').replace('a','*a*').replace('b','*b*').replace('c','*c*'))
-    st.write(cell_par[1].replace('A','𝛼').replace('B','𝛽').replace('G','𝛾'))
+    st.write(cell_par[1].split('Volume')[0].replace('A','𝛼').replace('B','𝛽').replace('G','𝛾'))
 
 
     fig, axes = plt.subplots(1,2,figsize=(12,4), dpi=100)
