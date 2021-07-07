@@ -72,6 +72,8 @@ keys = ['Upload']+list(known_crystal_structures.keys())
 crystal = st.selectbox('Or select a crystal structure',
         keys)
 
+if not os.path.exists('cif_files'):
+    os.makedirs('cif_files')
 if uploaded_file is not None or crystal != 'Upload':
     if crystal == 'Upload':
         with open('cif_files/'+uploaded_file.name,"wb") as f:
