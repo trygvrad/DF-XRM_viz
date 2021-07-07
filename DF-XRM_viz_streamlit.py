@@ -154,7 +154,8 @@ if uploaded_file is not None or crystal != 'Upload':
     material_str = ''.join(xtl.cif['_chemical_formula_sum'].replace('2','$_2$').replace('3','$_3$').split(' '))
     st.write(f'**{material_str}**  \n Density: {xtl.Properties.density():.3f} gm/cm'+r'$^3$')
     cell_par = str(xtl.Cell)
-    cell_par = cell_par.replace('\n','').replace('AA','A\nA').split('\n')
+    cell_par = cell_par.replace('\n','').replace('\r','').replace('A, A','AA').replace('A,A','AA')
+    cell_par = cell_par.replace('AA','A\nA').split('\n')
     #cell_par = [','.join(cps[0:3]), ','.join(cps[3:])]
     st.write(cell_par[0].replace('A','Å').replace('a','*a*').replace('b','*b*').replace('c','*c*'))
     st.write(cell_par[1].split('Volume')[0].replace('A','𝛼').replace('B','𝛽').replace('G','𝛾'))
