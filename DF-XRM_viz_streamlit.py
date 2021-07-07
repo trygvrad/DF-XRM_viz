@@ -301,8 +301,8 @@ if uploaded_file is not None or crystal != 'Upload':
         s = front_hkl_str.split(',')
         front_hkl = np.array([float(s[0]),float(s[1]),float(s[2])])
 
-        up_dir = xtl.Cell.calculateR(up_hkl)[0]
-        front_dir = xtl.Cell.calculateR(front_hkl)[0]
+        up_dir = xtl.Cell.calculateQ(up_hkl)[0]
+        front_dir = xtl.Cell.calculateQ(front_hkl)[0]
 
         if up_dir[0]>0:
             z_rot = -np.arctan2(up_dir[1],up_dir[0])*180/np.pi
