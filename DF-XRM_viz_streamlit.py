@@ -10,7 +10,7 @@ st.markdown(
         f"""
 <style>
     .reportview-container .main .block-container{{
-        max-width: {2000}px;
+        max-width: {1000}px;
         padding-top: {10}rem;
         padding-right: {2}rem;
         padding-left: {2}rem;
@@ -153,10 +153,14 @@ if uploaded_file is not None or crystal != 'Upload':
 
     material_str = ''.join(xtl.cif['_chemical_formula_sum'].replace('2','$_2$').replace('3','$_3$').split(' '))
     st.write(f'**{material_str}**  \n Density: {xtl.Properties.density():.3f} gm/cm'+r'$^3$')
+    cell_par = str(xtl.Cell)
+    cell_par = cell_par.split('\n')
+    st.write(cell_par[0].replace('A','Å').replace('a','*a*').replace('b','*b*').replace('c','*c*'))
+    st.write(cell_par[1].replace('A','𝛼').replace('B','𝛽').replace('G','𝛾'))
 
 
     fig, axes = plt.subplots(1,2,figsize=(12,4), dpi=100)
-
+    fig2d = fig
     import xraydb
     def att_length(xtl,energy_kev):
         atom_type = xtl.Structure.type
@@ -260,7 +264,7 @@ if uploaded_file is not None or crystal != 'Upload':
 
 
 
-    hkl_str = st.text_input('h, k, l', li[0][0][1:-1]) #min, max, default
+    hkl_str = st.text_input('Q vector h, k, l', li[0][0][1:-1]) #min, max, default
     hkl_spli = hkl_str.split(',')
     h = int(hkl_spli[0])
     k = int(hkl_spli[1])
@@ -271,22 +275,8 @@ if uploaded_file is not None or crystal != 'Upload':
     hkl = params['GEOMETRY']['hkl']
     Q = xtl.Cell.calculateQ(hkl)[0]
 
-    if Q[0]>0:
-        z_rot = -np.arctan2(Q[1],Q[0])*180/np.pi
-    else:
-        z_rot = -np.pi/2*np.sign(Q[1])*180/np.pi
 
-    y_rot = -np.arctan2(Q[2],np.sqrt(Q[0]**2+Q[1]**2))*180/np.pi
-    x_rot = 0.0
 
-    if st.checkbox('Custom unit cell rotation'):
-        z_rot_crystal = st.number_input('Rotate unit cell around Z',-360.0,360.0,z_rot) #min, max, default
-        y_rot_crystal = st.number_input('Then rotate around Y',-360.0,360.0,y_rot) #min, max, default
-        x_rot_crystal = st.number_input('Then rotate around X',-360.0,360.0,x_rot) #min, max, default
-    else:
-        z_rot_crystal = z_rot
-        y_rot_crystal = y_rot
-        x_rot_crystal = x_rot
 
     def crystal_rotation_function(hkl):
         '''
@@ -297,6 +287,40 @@ if uploaded_file is not None or crystal != 'Upload':
         rotate_y(hkl, y_rot_crystal*np.pi/180)# 45 degree rotation around the x-axis -> swap b and c
         rotate_x(hkl, x_rot_crystal*np.pi/180)# 45 degree rotation around the x-axis -> swap b and c
         return hkl
+
+    if True:#st.checkbox('Custom unit cell rotation'):
+        up_hkl_str = st.text_input("Sample 'up' h, k, l", hkl_str) #min, max, default
+        s = up_hkl_str.split(',')
+        up_hkl = np.array([float(s[0]),float(s[1]),float(s[2])])
+        if np.sum(np.abs(np.cross(up_hkl, np.array([0,0,1])))) >0:
+            front_hkl_str = st.text_input('Exit surface h, k, l', '0, 0 ,1') #min, max, default
+        else:
+            front_hkl_str = st.text_input('Exit surface h, k, l', '0, 1 ,0') #min, max, default
+        s = front_hkl_str.split(',')
+        front_hkl = np.array([float(s[0]),float(s[1]),float(s[2])])
+
+        up_dir = xtl.Cell.calculateR(up_hkl)[0]
+        front_dir = xtl.Cell.calculateR(front_hkl)[0]
+
+        if up_dir[0]>0:
+            z_rot = -np.arctan2(up_dir[1],up_dir[0])*180/np.pi
+        else:
+            z_rot = -np.pi/2*np.sign(up_dir[1])*180/np.pi
+        y_rot = -np.arctan2(up_dir[2],np.sqrt(up_dir[0]**2+up_dir[1]**2))*180/np.pi
+
+        z_rot_crystal = z_rot
+        y_rot_crystal = y_rot
+        x_rot_crystal = 0
+        front_dir = crystal_rotation_function(front_dir)
+        x_rot = np.arctan2(front_dir[1],front_dir[2])*180/np.pi
+        x_rot_crystal = x_rot
+
+
+        #z_rot_crystal = st.number_input('Rotate unit cell around Z',-360.0,360.0,z_rot) #min, max, default
+        #y_rot_crystal = st.number_input('Then rotate around Y',-360.0,360.0,y_rot) #min, max, default
+        #x_rot_crystal = st.number_input('Then rotate around X',-360.0,360.0,x_rot) #min, max, default
+
+
 
     Q = crystal_rotation_function(Q)*10**4 # in inverse um
     params['BEAM']['Q_vector'] =  Q
@@ -395,5 +419,48 @@ if uploaded_file is not None or crystal != 'Upload':
                                                                    )#(600*4, 300*4))
         st.plotly_chart(fig)
 
+        ############### print to pdf #################
+        import fpdf
+        pdf = fpdf.FPDF(orientation = 'P', unit = 'mm', format = 'A4')
+        pdf.add_page()
+        pdf.set_font('helvetica', '', 10)
+        #pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
+        #pdf.set_font('DejaVu', '', 14)
+        pdf.set_text_color(0, 0, 0)
+        txt =[]
+        txt.append(crystal)
+        txt.append(f'Using {url}')
+        txt.append(f'{material_str}\nDensity: {xtl.Properties.density():.3f} gm/cm3')
+        txt.append(cell_par[0])
+        txt.append(cell_par[1])
+        txt.append(f'Q vector hkl {hkl_str}')
+        txt.append(f"Sample 'up' hkl {up_hkl_str}")
+        txt.append(f'Exit surface {front_hkl_str}')
+        txt = '\n'.join(txt)
+        txt = txt.encode('latin-1', 'ignore').decode('latin-1')
+        pdf.set_xy(20, 20)
+        pdf.multi_cell(0, 4, txt, 0, 1,'L', False)
+
+        fig.write_image("3dfig.png")
+        fig2d.savefig("2dfig.png")
+        pdf.image('2dfig.png', w=200)
+        pdf.image('3dfig.png', w=200)
+
+
+        pdf.add_page()
+        pd.set_option('display.max_rows', 300)
+        tab = str(df)
+        tab = tab.replace('𝜃','theta').encode('latin-1', 'ignore').decode('latin-1')
+        pdf.multi_cell(0, 4, tab, 0, 1,'L', False)
+        pdf.output('DF-XRM_vis.pdf')
+
+        import base64
+        def get_binary_file_downloader_html(bin_file, file_label='File'):
+            with open(bin_file, 'rb') as f:
+                data = f.read()
+            bin_str = base64.b64encode(data).decode()
+            href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
+            return href
+        st.markdown(get_binary_file_downloader_html('DF-XRM_vis.pdf', 'pdf'), unsafe_allow_html=True)
 st.write("This toolbox is in beta testing, please independently verify all results, and let me know of any bugs :)")
 st.write("tmara@dtu.dk")
