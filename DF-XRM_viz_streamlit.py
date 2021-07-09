@@ -500,8 +500,21 @@ if uploaded_file is not None or crystal != 'Upload':
 
         fig.write_image("3dfig.png", scale = 2)
         fig2d.savefig("2dfig.png")
-        pdf.image('2dfig.png', w=160)
-        pdf.image('3dfig.png', w=200)
+        pdf.image('2dfig.png', w=200)
+
+        from PIL import Image
+
+        test_image = "3dfig.png"
+        original = Image.open(test_image)
+        width, height = original.size   # Get dimensions
+        left = width/6
+        top = height/4
+        right = 5 * width/6
+        bottom = 3 * height/4
+        cropped_example = original.crop((left, top, right, bottom))
+        cropped_example.save('3dfig_crop.png')
+
+        pdf.image('3dfig_crop.png', w=200)
 
 
         pdf.add_page()
