@@ -124,7 +124,7 @@ def make_3d_perspective(ex,
     returns:
         drawing, fig, ax
     '''
-
+    outstr = []
     if timing:
         global t0
         t0 = time.time()
@@ -162,9 +162,9 @@ def make_3d_perspective(ex,
     box_nodes, _, __ = drawing.add_box(box_shape, [0,0,0], meshcolor=[0,0,0,1], linewidth = 2, facecolor=bounding_box_facecolor, abscolor = False)
     # text box size
     print_time('# text box size')
-    drawing.add_text([0,1+0.5*box_shape[1],1+0.5*box_shape[2]], f'{box_shape[0]/scale:.2f} um')
-    drawing.add_text([1+0.5*box_shape[0],0,1+0.5*box_shape[2]], f'{box_shape[1]/scale:.2f} um')
-    drawing.add_text([-3-0.5*box_shape[0],0.5*box_shape[1],-8], f'{box_shape[2]/scale:.2f} um')
+    drawing.add_text([0,1+0.5*box_shape[1],1+0.5*box_shape[2]], f'{box_shape[0]/scale:.2f} µm')
+    drawing.add_text([1+0.5*box_shape[0],0,1+0.5*box_shape[2]], f'{box_shape[1]/scale:.2f} µm')
+    drawing.add_text([3+0.5*box_shape[0],-0.5*box_shape[1],-8], f'{box_shape[2]/scale:.2f} µm')
 
     # beam at end
     print_time('# beam at end')
@@ -195,13 +195,20 @@ def make_3d_perspective(ex,
         mid_point = ex.params['BEAM']['mid'] # mid in relative units
         mid_point = [mid_point[0] * ex.shape[0]*ex.del_x[0], mid_point[1] * ex.shape[1]*ex.del_x[1]]
 
+        #xr = np.cos(surface_angle)*(x -mid_point[0]) - np.sin(surface_angle)*(y -mid_point[1])
+        #yr = np.cos(surface_angle)*(y -mid_point[1]) + np.sin(surface_angle)*(x -mid_point[0])
+        #xr = xr / np.cos(incidence_angle)
+        #incidence_angle = np.arccos(ex.k0_vector[2]/np.linalg.norm(ex.k0_vector))
         # front intesection of beam
-        beam_loc_0 = np.array([0,1,0])*ex.params['BEAM']['transverse_width']
-        node_locs[0,0] = np.cos(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+beam_loc_0[0] +mid_point[0]) - np.sin(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+beam_loc_0[1] +mid_point[1])
-        node_locs[0,1] = np.cos(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+beam_loc_0[1] +mid_point[1]) + np.sin(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+beam_loc_0[0] +mid_point[0])
+        beam_with_dir = np.cross(ex.Q_vector,ex.k0_vector)
+        beam_with_dir /= np.sqrt(np.sum(beam_with_dir[0:3]**2))
+        incidence_angle = np.arcsin(beam_with_dir[2])
+        beam_loc_0 = beam_with_dir*ex.params['BEAM']['transverse_width']/np.cos(incidence_angle)**2
+        node_locs[0,0] = np.cos(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1])+beam_loc_0[0]
+        node_locs[0,1] = np.cos(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0])+beam_loc_0[1]
         node_locs[0,:] *= scale
-        node_locs[1,0] = np.cos(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]-beam_loc_0[0] +mid_point[0]) - np.sin(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]-beam_loc_0[1] +mid_point[1])
-        node_locs[1,1] = np.cos(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]-beam_loc_0[1] +mid_point[1]) + np.sin(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]-beam_loc_0[0] +mid_point[0])
+        node_locs[1,0] = np.cos(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1])-beam_loc_0[0]
+        node_locs[1,1] = np.cos(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0])-beam_loc_0[1]
         node_locs[1,:] *= scale
 
         node_locs[1,:] = node_locs[1,:]
@@ -342,12 +349,16 @@ def make_3d_perspective(ex,
             thickness_offset = np.cross(np.array([-np.sin(surface_angle),np.cos(surface_angle),0]), ex.k0_vector)
             thickness_offset *= 0.2/np.sqrt(np.sum(thickness_offset**2))
             # front intesection of beam
-            beam_loc_0 = np.array([0,1,0])*ex.params['BEAM']['transverse_width']
-            node_locs[0,0] = np.cos(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+beam_loc_0[0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+beam_loc_0[1]+mid_point[1])
-            node_locs[0,1] = np.cos(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+beam_loc_0[1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+beam_loc_0[0]+mid_point[0])
+            beam_with_dir = np.cross(ex.Q_vector,ex.k0_vector)
+            beam_with_dir /= np.sqrt(np.sum(beam_with_dir**2))
+            beam_loc_0 = beam_with_dir*ex.params['BEAM']['transverse_width']
+            node_locs[0,0] = np.cos(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1])+beam_loc_0[0]
+            node_locs[0,1] = np.cos(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0])+beam_loc_0[1]
+            node_locs[0,2] = beam_loc_0[2]
             node_locs[0,:] *= scale
-            node_locs[1,0] = np.cos(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]-beam_loc_0[0] +mid_point[0]) - np.sin(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]-beam_loc_0[1] +mid_point[1])
-            node_locs[1,1] = np.cos(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]-beam_loc_0[1] +mid_point[1]) + np.sin(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]-beam_loc_0[0] +mid_point[0])
+            node_locs[1,0] = np.cos(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1])-beam_loc_0[0]
+            node_locs[1,1] = np.cos(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0])-beam_loc_0[1]
+            node_locs[1,2] = -beam_loc_0[2]
             node_locs[1,:] *= scale
 
             node_locs[2,:] = node_locs[1,:]
@@ -476,7 +487,7 @@ def make_3d_perspective(ex,
         ar += np.array([box_shape[0]*0.25,box_shape[1]*0.25,0]) # shift this to off-center
 
     # add xyz arrows
-    if draw_axes:
+    if 0:
         xyz_arrows = []
         print_time('# add arrows')
         ar = drawing.add_arrow([0,0,0], [0,0,3],color=[0,0.1,1,1],nodes_per_circle=arrow_nodes_per_circle)
@@ -493,6 +504,24 @@ def make_3d_perspective(ex,
         ar = drawing.add_text([0,0,2.9], ax_hkl[2])#'[001]')
         xyz_arrows.append(ar)
 
+    # add id06 axes
+    if draw_axes:
+        xyz_arrows = []
+        print_time('# add arrows')
+        ar = drawing.add_arrow([0,0,0], [0,0,3],color=[1,0.1,0,1],nodes_per_circle=arrow_nodes_per_circle)
+        xyz_arrows.append(ar)
+        ar = drawing.add_arrow([0,0,0], [0,-3,0],color=[0,0.9,0.3,1],nodes_per_circle=arrow_nodes_per_circle)
+        xyz_arrows.append(ar)
+        ar = drawing.add_arrow([0,0,0], [3,0,0],color=[0,0.1,1,1],nodes_per_circle=arrow_nodes_per_circle, angle_offset=0)
+        xyz_arrows.append(ar)
+
+        ar = drawing.add_text([3.2,0,0], 'z')#'[100]')
+        xyz_arrows.append(ar)
+        ar = drawing.add_text([1,-2.8,-1.3], 'y')#'[010]')
+        xyz_arrows.append(ar)
+        ar = drawing.add_text([0,0,2.9], 'x')#'[001]')
+        xyz_arrows.append(ar)
+
     # add curved arrows
     if draw_curved_arrows:
         curved_arrows = []
@@ -505,25 +534,133 @@ def make_3d_perspective(ex,
         curved_arrows.append(ar)
     #drawing.add_isosurface_mesh(top_stage_mesh) # add top of stage
 
-    # top part of stage
     if draw_stage:
-        stage_dists = np.array([18.5,23,27,28,30,30.25,32.25, 32.5])-5
+        stage_dists = 2.2*65*np.array([18,20,20,22,25,28.25,30])-5
         stage_dists *= scale
+        stage_color = np.array([1.0,0.95,0.9,1])
         num_along_edge = 20
-        stage_size = 20
-        nodes, faces = add_stage_section(stage_dists[0], stage_dists[1], num_along_edge = num_along_edge, stage_size = stage_size)
-        nodes[:4*num_along_edge,0] = -stage_dists[0]
-        drawing.add_mesh(nodes, faces, facecolor=[0.4,0.3,0.2,1], abscolor=False)
+        stage_size = 35
+        # stage rotator
+        # top rotator
+        ar = drawing.add_arrow([-stage_dists[0],0,0],
+                               [-stage_dists[1],0,0],
+                               head_fraction = 0, rod_radius = 0.4*stage_size/(stage_dists[1]-stage_dists[0]),
+                               hat_radius = 0.1, nodes_per_circle = num_along_edge*4, color=stage_color, angle_offset=0)
+        # handle dot
+        ar = drawing.add_arrow([-0.5*(stage_dists[0]+stage_dists[1]),0.45*stage_size,0],
+                               [-0.5*(stage_dists[0]+stage_dists[1]),0.4*stage_size,0],
+                               head_fraction = 0, rod_radius = 17*0.3*(stage_dists[1]-stage_dists[0])/(0.55*stage_size),
+                               hat_radius = 0.0001, nodes_per_circle = num_along_edge, color=stage_color, angle_offset=0)
+    if not type(tilt_to_vector) == type(None):  # tilt fig rotation
+        #drawing.rot_x(-np.arcsin(k0_butt_node[1]/np.sqrt(k0_butt_node[1]**2+k0_butt_node[2]**2)))
+        def rot_to_vec(vec0, phi, chi, omega):
+            vec = np.copy(vec0)
+            rotate_x(vec,phi)
+            rotate_z(vec,chi)
+            rotate_y(vec,omega)
+            return vec
 
-    if not type(tilt_to_vector) == type(None): # tilt fig rocking
-        drawing.rot_y(-np.arctan(tilt_to_vector[2]/tilt_to_vector[0]))
+        phi = np.arctan2(ex.k0_vector[1],ex.k0_vector[2])
+        #print(tilt_to_vector)
+        vec = np.copy(tilt_to_vector)
+        rotate_x(vec,phi)
+        chi = np.arctan2(vec[1],np.sqrt(vec[0]**2+vec[2]**2))
+        rotate_z(vec,chi)
+        omega = -np.arctan2(vec[2],vec[0])+np.pi
+        vec2 = rot_to_vec(tilt_to_vector, phi, chi, omega)
+
+        #print(vec2)
+
+        import scipy.optimize
+
+        def rot_to_fit(inp):
+            phi = inp[0]
+            chi = inp[1]
+            omega = inp[2]
+            vec = np.copy(tilt_to_vector)
+            vec2 = np.copy(ex.k0_vector)
+            rotate_x(vec,phi)
+            rotate_x(vec2,phi)
+            #chi = np.arctan2(vec[1],np.sqrt(vec[0]**2+vec[2]**2))
+            rotate_z(vec,chi)
+            rotate_z(vec2,chi)
+
+            rotate_y(vec,omega)
+            rotate_y(vec2,omega)
+            vec = vec/np.sqrt(np.sum(vec**2))
+            vec2 = vec2/np.sqrt(np.sum(vec2**2))
+            #print(vec, vec2)
+            #print( np.abs(vec[0]-1)*1000+np.abs(vec[2])+np.abs(vec[1])+np.abs(vec2[0])+np.abs(vec2[1]))
+            return np.abs(vec[0]-1)+np.abs(vec2[2]-1)+np.abs(vec[2])+np.abs(vec[1])+np.abs(vec2[0])+np.abs(vec2[1])# + np.abs(ex.k0_vector[0]) + np.abs(ex.k0_vector[1])
+
+        out= scipy.optimize.minimize(rot_to_fit,np.array([phi,chi,omega]), tol=10**-10)
+        #print(out)
+        phi = out['x'][0]
+        chi = out['x'][1]
+        omega = out['x'][2]
+        vec2 = rot_to_vec(tilt_to_vector, phi, chi, omega)
+        #print(vec2)
+        drawing.rot_x(phi)
+    if draw_stage:
+        # bottom rotator
+        stage_color= np.copy(stage_color)
+        stage_color[0:3]*= 0.8
+        ar = drawing.add_arrow([-stage_dists[2],0,0],
+                               [-stage_dists[3],0,0],
+                               head_fraction = 0, rod_radius = 0.4*stage_size/(stage_dists[3]-stage_dists[2]),
+                               hat_radius = 0.1, nodes_per_circle = num_along_edge*4, color=stage_color, angle_offset=0)
+        # handle dot
+        ar = drawing.add_arrow([-0.5*(stage_dists[2]+stage_dists[3]),0.45*stage_size,0],
+                               [-0.5*(stage_dists[2]+stage_dists[3]),0.4*stage_size,0],
+                               head_fraction = 0, rod_radius = 17*0.3*(stage_dists[1]-stage_dists[0])/(0.55*stage_size),
+                               hat_radius = 0.0001, nodes_per_circle = num_along_edge, color=stage_color, angle_offset=0)
+
+        nodes, faces = add_stage_section(stage_dists[4]+0.1, stage_dists[3], num_along_edge = num_along_edge, stage_size = stage_size)
+        nodes[4*num_along_edge:,0] = -stage_dists[3]+0.1
+        drawing.add_mesh(nodes, faces, facecolor=stage_color, abscolor=False)
+
+        phi_ang = -phi*180/np.pi %360
+        if phi_ang>180:
+            phi_ang-=360
+        ar = drawing.add_text(np.copy(ar.node_locations[-1])+np.array([3,3,0]), f'𝜑 = {phi_ang:.2f}°')
+        outstr.append(f'phi = {phi_ang:.2f} degrees')
+    if not type(tilt_to_vector) == type(None): # tilt fig azimuthal
+        drawing.rot_z(chi)
     # mid part of stage
     if draw_stage:
-        nodes, faces = add_stage_section(stage_dists[1]+0.1, stage_dists[2], num_along_edge = num_along_edge, stage_size = stage_size)
+        stage_color= np.copy(stage_color)
+        stage_color[0:3]*= 1.2
+        nodes, faces = add_stage_section(stage_dists[5]+0.1, stage_dists[4], num_along_edge = num_along_edge, stage_size = stage_size)
         temp = np.copy(nodes[:,1])
         nodes[:,1] = nodes[:,2]
         nodes[:,2] = temp
-        drawing.add_mesh(nodes, faces, facecolor=[0.5,0.4,0.3,1], abscolor=False)
+        drawing.add_mesh(nodes, faces, facecolor=stage_color, abscolor=False)
+        chi_ang = -chi*180/np.pi %360
+        if chi_ang>180:
+            chi_ang-=360
+        ar = drawing.add_text(np.array([-stage_dists[4],0,-stage_size*0.5]), f'𝜒 = {-chi_ang:.2f}°')
+        outstr.append(f'chi = {-chi_ang:.2f} degrees')
+
+
+    if not type(tilt_to_vector) == type(None): # tilt fig rocking
+        drawing.rot_y(omega)
+    # table
+    #table_nodes, _, __ = drawing.add_box([0,stage_size*10,stage_size*10], [-stage_dists[7],0,0], angle_vector=np.array([0,0,0]),
+
+    # top part of stage
+    if draw_stage:
+        stage_color= np.copy(stage_color)
+        stage_color[0:3]*= 0.8
+        nodes, faces = add_stage_section(stage_dists[6], stage_dists[5], num_along_edge = num_along_edge, stage_size = stage_size)
+        nodes[:4*num_along_edge,0] = -stage_dists[6]
+        drawing.add_mesh(nodes, faces, facecolor=stage_color, abscolor=False)
+        omega_ang = -omega*180/np.pi %360
+        if omega_ang>180:
+            omega_ang-=360
+        ar = drawing.add_text(np.array([-stage_dists[5],stage_size*0.5,0]), f'𝜔 = {-omega_ang:.2f}°')
+        outstr.append(f'omega = {-omega_ang:.2f} degrees')
+
+
     # azimuthal curve
     #drawing.add_isosurface_mesh(mid_stage_mesh) # add middle part of stage
     if draw_curved_arrows:
@@ -533,42 +670,6 @@ def make_3d_perspective(ex,
         ar = drawing.add_text(np.copy(ar.node_locations[-1]), 'Azimuthal')
         curved_arrows.append(ar)
 
-    if not type(tilt_to_vector) == type(None): # tilt fig azimuthal
-        drawing.rot_z(np.arctan2(tilt_to_vector[1],np.sqrt(tilt_to_vector[0]**2+tilt_to_vector[2]**2)))
-
-    # bottom part of stage
-    if draw_stage:
-        nodes, faces = add_stage_section(stage_dists[2]+0.1, stage_dists[3], num_along_edge = num_along_edge, stage_size = stage_size)
-        nodes[4*num_along_edge:,0] = -stage_dists[3]+0.1
-        drawing.add_mesh(nodes, faces, facecolor=[0.6,0.5,0.4,1], abscolor=False)
-
-        # stage rotator
-        # top rotator
-        ar = drawing.add_arrow([-stage_dists[3],0,0],
-                               [-stage_dists[4],0,0],
-                               head_fraction = 0, rod_radius = 0.8*stage_size/(stage_dists[4]-stage_dists[3]),
-                               hat_radius = 0.1, nodes_per_circle = num_along_edge*4, color=[0.5,0.4,0.3,1], angle_offset=0)
-        # handle dot
-        ar = drawing.add_arrow([-0.5*(stage_dists[3]+stage_dists[4]),0.85*stage_size,0],
-                               [-0.5*(stage_dists[3]+stage_dists[4]),0.8*stage_size,0],
-                               head_fraction = 0, rod_radius = 17*0.3*(stage_dists[4]-stage_dists[3])/(0.55*stage_size),
-                               hat_radius = 0.0001, nodes_per_circle = num_along_edge, color=[0.5,0.4,0.3,1], angle_offset=0)
-        if not type(tilt_to_vector) == type(None):  # tilt fig rotation
-            drawing.rot_x(-np.arcsin(k0_butt_node[1]/np.sqrt(k0_butt_node[1]**2+k0_butt_node[2]**2)))
-        # bottom rotator
-        ar = drawing.add_arrow([-stage_dists[5],0,0],
-                               [-stage_dists[6],0,0],
-                               head_fraction = 0, rod_radius = 0.8*stage_size/(stage_dists[6]-stage_dists[5]),
-                               hat_radius = 0.1, nodes_per_circle = num_along_edge*4, color=[0.6,0.5,0.4,1], angle_offset=0)
-        # handle dot
-        ar = drawing.add_arrow([-0.5*(stage_dists[5]+stage_dists[6]),0.85*stage_size,0],
-                               [-0.5*(stage_dists[5]+stage_dists[6]),0.8*stage_size,0],
-                               head_fraction = 0, rod_radius = 17*0.3*(stage_dists[4]-stage_dists[3])/(0.55*stage_size),
-                               hat_radius = 0.0001, nodes_per_circle = num_along_edge, color=[0.6,0.5,0.4,1], angle_offset=0)
-        # table
-        #table_nodes, _, __ = drawing.add_box([0,stage_size*10,stage_size*10], [-stage_dists[7],0,0], angle_vector=np.array([0,0,0]),
-        #                                   meshcolor=[0,0,0,0], linewidth = 0, facecolor=[0.7,0.7,0.7,1], abscolor = False)
-    # rotation curve
     if draw_curved_arrows:
         f=1.5/4
         ar = drawing.add_curved_arrow([-1,0,0],[-1,6/np.sqrt(2)/1.5,-6/np.sqrt(2)/1.5],[0,0,1], angular_extent = 4*np.pi/3, links = curved_ar_links*3,
@@ -576,6 +677,24 @@ def make_3d_perspective(ex,
         curved_arrows.append(ar)
         ar = drawing.add_text([-1,1,4], 'Rotation')
         curved_arrows.append(ar)
+
+    # add id06 axes
+    if 0:
+        xyz_arrows = []
+        print_time('# add arrows')
+        ar = drawing.add_arrow([0,0,0], [0,0,3],color=[1,0.1,0,1],nodes_per_circle=arrow_nodes_per_circle)
+        xyz_arrows.append(ar)
+        ar = drawing.add_arrow([0,0,0], [0,-3,0],color=[0,0.9,0.3,1],nodes_per_circle=arrow_nodes_per_circle)
+        xyz_arrows.append(ar)
+        ar = drawing.add_arrow([0,0,0], [3,0,0],color=[0,0.1,1,1],nodes_per_circle=arrow_nodes_per_circle, angle_offset=0)
+        xyz_arrows.append(ar)
+
+        ar = drawing.add_text([3.2,0,0], 'z')#'[100]')
+        xyz_arrows.append(ar)
+        ar = drawing.add_text([1,-2.8,-1.3], 'y')#'[010]')
+        xyz_arrows.append(ar)
+        ar = drawing.add_text([0,0,2.9], 'x')#'[001]')
+        xyz_arrows.append(ar)
     # rotate perspective nicely
     print_time('# rotate perspective nicely')
     drawing.rot_y(-90*np.pi/180)
@@ -589,7 +708,7 @@ def make_3d_perspective(ex,
     if draw_axes:
         for ar in xyz_arrows:
             ar*=30/8
-            ar += np.array([-5,-10,10])*30/8
+            ar += np.array([-10,-10,-10])*30/8
     if draw_curved_arrows:
         for ar in curved_arrows:
             ar*=30/8
@@ -637,7 +756,7 @@ def make_3d_perspective(ex,
     if not type(export_blender_filepath) == type(None):
         drawing.export_blender(export_blender_filepath)
 
-    return drawing, fig, ax
+    return drawing, fig, ax, outstr
 
 
 def isosurface_mesh_from_matrix(threeD_matrix, level = 0, step_size = 10, del_x = np.array([1,1,1]), meshcolor=[0,0,0,0], facecolor=[1,0.6,0,0.7], abscolor=True):
@@ -1391,3 +1510,42 @@ def vector_to_hkl(vector):
         int_vector[int_vector<0] -= 1 # correct rounding for neg numbers
         int_vector = int_vector//np.gcd.reduce(np.abs(int_vector)) # divide by the greatest common divisor
         return int_vector
+
+
+
+def rotate(x,z,phi):
+    '''
+    common rotation function, rotates
+    rotation in the plane x,z according to phi
+    input:
+        x,z floats or numpy arrays
+        input: phi, angle in radians
+    returns:
+        rotated x, rotated z
+    '''
+    return x*np.cos(phi)-z*np.sin(phi),z*np.cos(phi)+x*np.sin(phi)
+
+def rotate_x(loc,phi):
+    '''
+    rotate_x: rotates around x axis (horisontal)
+    input: phi, angle in radians
+    '''
+    x,z=rotate(loc[1],loc[2],phi)
+    loc[1] = x
+    loc[2] = z
+def rotate_y(loc,phi):
+    '''
+    rotate_y: rotates around y axis (vertical)
+    input: phi, angle in radians
+    '''
+    x,z=rotate(loc[0],loc[2],phi)
+    loc[0] = x
+    loc[2] = z
+def rotate_z(loc,phi):
+    '''
+    rotate_z: rotates around z axis (out-of-plane)
+    input: phi, angle in radians
+    '''
+    x,z=rotate(loc[0],loc[1],phi)
+    loc[0] = x
+    loc[1] = z

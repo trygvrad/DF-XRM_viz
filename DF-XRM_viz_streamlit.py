@@ -265,9 +265,10 @@ if uploaded_file is not None or crystal != 'Upload':
     #df = df.append(a_series, ignore_index=True)
 
 
+    st.sidebar.markdown('Scattering vector')
 
-    hkl_str = st.text_input('Q vector h, k, l', li[0][0][1:-1]) #min, max, default
-    hkl_spli = hkl_str.split(',')
+    hkl_str = st.sidebar.text_input('Q vector (h, k, l)', '('+li[0][0][1:-1]+')') #min, max, default
+    hkl_spli = hkl_str.strip('()').split(',')
     h = int(hkl_spli[0])
     k = int(hkl_spli[1])
     l = int(hkl_spli[2])
@@ -290,19 +291,37 @@ if uploaded_file is not None or crystal != 'Upload':
         rotate_x(hkl, x_rot_crystal*np.pi/180)# 45 degree rotation around the x-axis -> swap b and c
         return hkl
 
-    if True:#st.checkbox('Custom unit cell rotation'):
-        up_hkl_str = st.text_input("Sample 'up' h, k, l", hkl_str) #min, max, default
-        s = up_hkl_str.split(',')
-        up_hkl = np.array([float(s[0]),float(s[1]),float(s[2])])
-        if np.sum(np.abs(np.cross(up_hkl, np.array([0,0,1])))) >0:
-            front_hkl_str = st.text_input('Exit surface h, k, l', '0, 0 ,1') #min, max, default
-        else:
-            front_hkl_str = st.text_input('Exit surface h, k, l', '0, 1 ,0') #min, max, default
-        s = front_hkl_str.split(',')
-        front_hkl = np.array([float(s[0]),float(s[1]),float(s[2])])
+    if True:#
+        st.sidebar.markdown('Crystal-sample geometry')
+        up_hkl_str = st.sidebar.text_input("Sample 'up' (h,k,l) or [u,v,w,]", '') #min, max, default
+        front_hkl_str = st.sidebar.text_input('Exit surface ~(h,k,l) or ~[u,v,w,]', '') #min, max, default
 
-        up_dir = xtl.Cell.calculateQ(up_hkl)[0]
-        front_dir = xtl.Cell.calculateQ(front_hkl)[0]
+        if not up_hkl_str == '':
+            s = up_hkl_str.strip('[()]').split(',')
+            up_hkl = np.array([float(s[0]),float(s[1]),float(s[2])])
+            if '(' in up_hkl_str:
+                up_dir = xtl.Cell.calculateQ(up_hkl)[0]
+            else:
+                up_dir = xtl.Cell.calculateR(up_hkl)[0]
+        else:
+            up_dir = Q
+            st.write(f'Sample up direction = Q')
+
+        if not front_hkl_str == '':
+            s = front_hkl_str.strip('[()]').split(',')
+            front_hkl = np.array([float(s[0]),float(s[1]),float(s[2])])
+            if '(' in front_hkl_str:
+                front_dir = xtl.Cell.calculateQ(front_hkl)[0]
+            else:
+                front_dir = xtl.Cell.calculateR(front_hkl)[0]
+        else:
+            front_dir = np.cross(Q,np.array([0,0,1]))
+            if np.sum(front_dir)<0.0001:
+                front_dir = np.cross(Q,np.array([0,1,0]))
+            front_index = xtl.Cell.indexQ(front_dir)[0]
+            front_index/=np.sqrt(np.sum(front_index**2))
+            st.write(f'Sample exit surface = ({front_index[0]:.2f},{front_index[1]:.2f},{front_index[2]:.2f})')
+
 
         if up_dir[0]>0:
             z_rot = -np.arctan2(up_dir[1],up_dir[0])*180/np.pi
@@ -313,8 +332,8 @@ if uploaded_file is not None or crystal != 'Upload':
         z_rot_crystal = z_rot
         y_rot_crystal = y_rot
         x_rot_crystal = 0
-        front_dir = crystal_rotation_function(front_dir)
-        x_rot = np.arctan2(front_dir[1],front_dir[2])*180/np.pi
+        front_dir_r = crystal_rotation_function(np.copy(front_dir))
+        x_rot = np.arctan2(front_dir_r[1],front_dir_r[2])*180/np.pi
         x_rot_crystal = x_rot
 
 
@@ -376,7 +395,24 @@ if uploaded_file is not None or crystal != 'Upload':
         lmbd = float(params['BEAM']['lmbd'])
         k_abs = 2*np.pi/lmbd
         Q = np.linalg.norm(ex.Q_vector)
-        plane_normal = np.cross(ex.Q_vector,np.array([0,0,1]))
+        st.sidebar.markdown('Beam-crystal geometry')
+        beam_exit_hkl_str = st.sidebar.text_input('Beam exit direction ~(h,k,l) or ~[u,v,w,]', '') #min, max, default
+        st.sidebar.write("For the 'exit surface' and 'sampe up' vectors, only the component orthogonal to Q is perserved")
+
+        if not beam_exit_hkl_str == '':
+            s = beam_exit_hkl_str.strip('[()]').split(',')
+            beam_exit_hkl = np.array([float(s[0]),float(s[1]),float(s[2])])
+            if '(' in beam_exit_hkl_str:
+                beam_exit_dir = xtl.Cell.calculateQ(beam_exit_hkl)[0]
+            else:
+                beam_exit_dir = xtl.Cell.calculateR(beam_exit_hkl)[0]
+        else:
+            beam_exit_dir = front_dir
+            exit_index = xtl.Cell.indexQ(beam_exit_dir)[0]
+            exit_index/=np.sqrt(np.sum(exit_index**2))
+            st.write(f'Beam exit direction = ({exit_index[0]:.2f},{exit_index[1]:.2f},{exit_index[2]:.2f})')
+        beam_exit_dir = crystal_rotation_function(beam_exit_dir)
+        plane_normal = np.cross(ex.Q_vector,beam_exit_dir)
         k_dir_orthogonal_to_Q = np.cross(plane_normal,ex.Q_vector)
         k_ort_l = np.linalg.norm(k_dir_orthogonal_to_Q)
         if 0:
@@ -399,7 +435,7 @@ if uploaded_file is not None or crystal != 'Upload':
     st.write(f'Instrument alignment on [{"".join(hkl_spli)}]:  \n 2𝜃 = {twotheta:.3f}')
 
     if 1:
-        drawing, fig, ax, = three_d_draw.make_3d_perspective(ex, #volume_data = make_internals(step_size = 1),
+        drawing, fig, ax, outstr = three_d_draw.make_3d_perspective(ex, #volume_data = make_internals(step_size = 1),
                                                                 scale = 0.1/8,
                                                                 beam_step_size = 1, show_beam_at_end = False,
                                                                 view_angle=20, fig_size = (12,6), factor = 350,
@@ -408,7 +444,7 @@ if uploaded_file is not None or crystal != 'Upload':
                                                                 imaging_system_lw = 0,
                                                                 extend_beam = [30*150/sample_thickness,30*150/sample_thickness],
                                                                 draw_axes = True,
-                                                                draw_curved_arrows = True,
+                                                                #draw_curved_arrows = True,
                                                                 beam_draw_mesh = False,
                                                                 #draw_face_axes = True,
                                                                 crystal_rotation_function = crystal_rotation_function,
@@ -418,7 +454,11 @@ if uploaded_file is not None or crystal != 'Upload':
                                                                 #lens_scale = 0.5,
                                                                 final_rotation_function= final_rotation_function,
                                                                 bounding_box_facecolor = [0,0,0,0.3],
+                                                                draw_stage = True,
                                                                    )#(600*4, 300*4))
+
+        for i in range(len(outstr)):
+            st.write(outstr[i].replace('phi','𝜑').replace('chi','𝜒').replace('omega','𝜔'))
         st.plotly_chart(fig)
 
         ############### print to pdf #################
@@ -436,16 +476,31 @@ if uploaded_file is not None or crystal != 'Upload':
         txt.append(cell_par[0])
         txt.append('A = ' +cell_par[1])
         txt.append(f'Q vector hkl {hkl_str}')
-        txt.append(f"Sample 'up' hkl {up_hkl_str}")
-        txt.append(f'Exit surface {front_hkl_str}')
+        txt.append(f'2theta = {twotheta:.3f}')
+
+        if not up_hkl_str == '':
+            txt.append(f"Sample 'up' hkl {up_hkl_str}")
+        else:
+            txt.append(f'Sample up direction = Q')
+        if not front_hkl_str == '':
+            txt.append(f'Exit surface {front_hkl_str}')
+        else:
+            txt.append(f'Sample exit surface = ({front_index[0]:.2f},{front_index[1]:.2f},{front_index[2]:.2f})')
+        for i in range(len(outstr)):
+            txt.append(outstr[i])
+        if not beam_exit_hkl_str == '':
+            txt.append(f'Beam exit direction = {beam_exit_hkl_str}')
+        else:
+            txt.append(f'Beam exit direction = ({exit_index[0]:.2f},{exit_index[1]:.2f},{exit_index[2]:.2f})')
+
         txt = '\n'.join(txt)
-        txt = txt.encode('latin-1', 'ignore').decode('latin-1')
+        txt = txt.encode('latin-1',  'ignore').decode('latin-1')
         pdf.set_xy(20, 20)
         pdf.multi_cell(0, 4, txt, 0, 1,'L', False)
 
-        fig.write_image("3dfig.png")
+        fig.write_image("3dfig.png", scale = 2)
         fig2d.savefig("2dfig.png")
-        pdf.image('2dfig.png', w=200)
+        pdf.image('2dfig.png', w=160)
         pdf.image('3dfig.png', w=200)
 
 
