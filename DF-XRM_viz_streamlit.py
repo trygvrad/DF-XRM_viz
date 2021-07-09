@@ -460,77 +460,82 @@ if uploaded_file is not None or crystal != 'Upload':
         for i in range(len(outstr)):
             st.write(outstr[i].replace('phi','𝜑').replace('chi','𝜒').replace('omega','𝜔'))
         st.plotly_chart(fig)
+        if 1:
+            ############### print to pdf #################
+            import fpdf
+            pdf = fpdf.FPDF(orientation = 'P', unit = 'mm', format = 'A4')
+            pdf.add_page()
+            pdf.set_font('helvetica', '', 10)
+            #pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
+            #pdf.set_font('DejaVu', '', 14)
+            pdf.set_text_color(0, 0, 0)
+            txt =[]
+            txt.append(crystal)
+            txt.append(f'Using {url}')
+            txt.append(f'{material_str}\nDensity: {xtl.Properties.density():.3f} gm/cm3')
+            txt.append(cell_par[0])
+            txt.append('A = ' +cell_par[1])
+            txt.append(f'Q vector hkl {hkl_str}')
+            txt.append(f'2theta = {twotheta:.3f}')
 
-        ############### print to pdf #################
-        import fpdf
-        pdf = fpdf.FPDF(orientation = 'P', unit = 'mm', format = 'A4')
-        pdf.add_page()
-        pdf.set_font('helvetica', '', 10)
-        #pdf.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
-        #pdf.set_font('DejaVu', '', 14)
-        pdf.set_text_color(0, 0, 0)
-        txt =[]
-        txt.append(crystal)
-        txt.append(f'Using {url}')
-        txt.append(f'{material_str}\nDensity: {xtl.Properties.density():.3f} gm/cm3')
-        txt.append(cell_par[0])
-        txt.append('A = ' +cell_par[1])
-        txt.append(f'Q vector hkl {hkl_str}')
-        txt.append(f'2theta = {twotheta:.3f}')
+            if not up_hkl_str == '':
+                txt.append(f"Sample 'up' hkl {up_hkl_str}")
+            else:
+                txt.append(f'Sample up direction = Q')
+            if not front_hkl_str == '':
+                txt.append(f'Exit surface {front_hkl_str}')
+            else:
+                txt.append(f'Sample exit surface = ({front_index[0]:.2f},{front_index[1]:.2f},{front_index[2]:.2f})')
+            for i in range(len(outstr)):
+                txt.append(outstr[i])
+            if not beam_exit_hkl_str == '':
+                txt.append(f'Beam exit direction = {beam_exit_hkl_str}')
+            else:
+                txt.append(f'Beam exit direction = ({exit_index[0]:.2f},{exit_index[1]:.2f},{exit_index[2]:.2f})')
 
-        if not up_hkl_str == '':
-            txt.append(f"Sample 'up' hkl {up_hkl_str}")
-        else:
-            txt.append(f'Sample up direction = Q')
-        if not front_hkl_str == '':
-            txt.append(f'Exit surface {front_hkl_str}')
-        else:
-            txt.append(f'Sample exit surface = ({front_index[0]:.2f},{front_index[1]:.2f},{front_index[2]:.2f})')
-        for i in range(len(outstr)):
-            txt.append(outstr[i])
-        if not beam_exit_hkl_str == '':
-            txt.append(f'Beam exit direction = {beam_exit_hkl_str}')
-        else:
-            txt.append(f'Beam exit direction = ({exit_index[0]:.2f},{exit_index[1]:.2f},{exit_index[2]:.2f})')
+            txt = '\n'.join(txt)
+            txt = txt.encode('latin-1',  'ignore').decode('latin-1')
+            pdf.set_xy(20, 20)
+            pdf.multi_cell(0, 4, txt, 0, 1,'L', False)
 
-        txt = '\n'.join(txt)
-        txt = txt.encode('latin-1',  'ignore').decode('latin-1')
-        pdf.set_xy(20, 20)
-        pdf.multi_cell(0, 4, txt, 0, 1,'L', False)
+            fig.write_image("3dfig.png")
 
-        fig.write_image("3dfig.png", scale = 2)
-        fig2d.savefig("2dfig.png")
-        pdf.image('2dfig.png', w=200)
+            import plotly.io as pio
+            scope = pio.kaleido.scope
+            scope._shutdown_kaleido()
 
-        from PIL import Image
+            fig2d.savefig("2dfig.png")
+            pdf.image('2dfig.png', w=200)
 
-        test_image = "3dfig.png"
-        original = Image.open(test_image)
-        width, height = original.size   # Get dimensions
-        left = width/6
-        top = height/4
-        right = 5 * width/6
-        bottom = 3 * height/4
-        cropped_example = original.crop((left, top, right, bottom))
-        cropped_example.save('3dfig_crop.png')
+            from PIL import Image
 
-        pdf.image('3dfig_crop.png', w=200)
+            test_image = "3dfig.png"
+            original = Image.open(test_image)
+            width, height = original.size   # Get dimensions
+            left = width/6
+            top = height/4
+            right = 5 * width/6
+            bottom = 3 * height/4
+            cropped_example = original.crop((left, top, right, bottom))
+            cropped_example.save('3dfig_crop.png')
+
+            pdf.image('3dfig_crop.png', w=200)
 
 
-        pdf.add_page()
-        pd.set_option('display.max_rows', 300)
-        tab = str(df)
-        tab = tab.replace('𝜃','theta').encode('latin-1', 'ignore').decode('latin-1')
-        pdf.multi_cell(0, 4, tab, 0, 1,'L', False)
-        pdf.output('DF-XRM_vis.pdf')
+            pdf.add_page()
+            pd.set_option('display.max_rows', 300)
+            tab = str(df)
+            tab = tab.replace('𝜃','theta').encode('latin-1', 'ignore').decode('latin-1')
+            pdf.multi_cell(0, 4, tab, 0, 1,'L', False)
+            pdf.output('DF-XRM_vis.pdf')
 
-        import base64
-        def get_binary_file_downloader_html(bin_file, file_label='File'):
-            with open(bin_file, 'rb') as f:
-                data = f.read()
-            bin_str = base64.b64encode(data).decode()
-            href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
-            return href
-        st.markdown(get_binary_file_downloader_html('DF-XRM_vis.pdf', 'pdf'), unsafe_allow_html=True)
+            import base64
+            def get_binary_file_downloader_html(bin_file, file_label='File'):
+                with open(bin_file, 'rb') as f:
+                    data = f.read()
+                bin_str = base64.b64encode(data).decode()
+                href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
+                return href
+            st.markdown(get_binary_file_downloader_html('DF-XRM_vis.pdf', 'pdf'), unsafe_allow_html=True)
 st.write("This toolbox is in beta testing, please independently verify all results, and let me know of any bugs :)")
 st.write("tmara@dtu.dk")
