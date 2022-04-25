@@ -2,3 +2,4 @@ cif_files/*
 DF-XRM_vis.pdf
 *fig*.png
 __pycache__/*
+*.pickled

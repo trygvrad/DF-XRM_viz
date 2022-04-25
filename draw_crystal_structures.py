@@ -1,14 +1,14 @@
-
-
 import three_d_draw_object_classes as object_classes
 import three_d_draw
 import numpy as np
 
 def add_crystal_structure( cif_file, scale = 4.0, rotation_function = None, legend_pos_shift = [0,0,0], cage_list = ['Ti', 'Nb'], axes_shift=None, make_bonds = ['X','X'], linewidth=1,
                             max_bond_length = 2.5, min_bond_length = 0,
+                            oxygen_cage_radius = 2.5,
                             bounding_box_facecolor = [0,0,0,0],
                             cage_line_color = [0,0,0,1],
-                            linecolor = [1,1,1,1]):
+                            linecolor = [1,1,1,1],
+                            show_text = True):
     '''
     adds a crystal structure
     input:
@@ -20,6 +20,7 @@ def add_crystal_structure( cif_file, scale = 4.0, rotation_function = None, lege
         cage_list: list of ions to make oxygen cages around
         axes_shift: default None, position of the axes of form [0,2,0] etc.
         make_bonds: atoms to make bonds between, i.e. ['Ti','O']
+        show_text: if True, show text
     returns:
         list of objects
     '''
@@ -89,7 +90,7 @@ def add_crystal_structure( cif_file, scale = 4.0, rotation_function = None, lege
             cage_in_AA = []
             for edge_loc, typ in zip(loc_in_AA, atom_types):
                 if typ == 'O':
-                    if np.sqrt(np.sum((center_loc-edge_loc)**2)) < 2.5:
+                    if np.sqrt(np.sum((center_loc-edge_loc)**2)) < oxygen_cage_radius:
                         cage_in_AA.append(edge_loc)
             node_collection = object_classes.NodeCollection(cage_in_AA)
             #print(np.array(cage_in_AA))
@@ -124,24 +125,27 @@ def add_crystal_structure( cif_file, scale = 4.0, rotation_function = None, lege
     end = xtl.Cell.calculateR([1,0,0])[0]
     end = end/np.sqrt(np.sum(end**2))*2.0*scale
     mesh = three_d_draw.make_arrow_mesh(origo, origo+end, head_fraction = 0.45, rod_radius = 0.1, hat_radius = 0.25, nodes_per_circle = 12, color=[1,0,0,1], angle_offset=0)
-    text = object_classes.Text(origo+end*1.2, 'a', color=[0,0,0,1], scale=0.9)
     axes_objects.append(mesh)
-    axes_objects.append(text)
+    if show_text:
+        text = object_classes.Text(origo+end*1.2, 'a', color=[0,0,0,1], scale=0.9)
+        axes_objects.append(text)
     # 010
     end = xtl.Cell.calculateR([0,1,0])[0]
     end = end/np.sqrt(np.sum(end**2))*2.0*scale
     mesh = three_d_draw.make_arrow_mesh(origo, origo+end, head_fraction = 0.45, rod_radius = 0.1, hat_radius = 0.25, nodes_per_circle = 12, color=[0,1,0,1], angle_offset=0)
-    text = object_classes.Text(origo+end*1.2, 'b', color=[0,0,0,1], scale=0.9)
     axes_objects.append(mesh)
-    axes_objects.append(text)
+    if show_text:
+        text = object_classes.Text(origo+end*1.2, 'b', color=[0,0,0,1], scale=0.9)
+        axes_objects.append(text)
     # 010
     end = xtl.Cell.calculateR([0,0,1])[0]
     end = end/np.sqrt(np.sum(end**2))*2.0*scale
     mesh = three_d_draw.make_arrow_mesh(origo, origo+end, head_fraction = 0.45, rod_radius = 0.1, hat_radius = 0.25, nodes_per_circle = 12, color=[0,0,1,1], angle_offset=0)
-    text = object_classes.Text(origo+end*1.2, 'c', color=[0,0,0,1], scale=0.9)
     axes_objects.append(mesh)
-    axes_objects.append(text)
-    origo = np.min(box_node_collection.node_locations, axis=0)*1.1
+    text = object_classes.Text(origo+end*1.2, 'c', color=[0,0,0,1], scale=0.9)
+    if show_text:
+        axes_objects.append(text)
+        origo = np.min(box_node_collection.node_locations, axis=0)*1.1
     for obj in axes_objects:
         objects.append(obj)
     ############## rotate #############
@@ -161,7 +165,10 @@ def add_crystal_structure( cif_file, scale = 4.0, rotation_function = None, lege
             for node in nodes:
                 rotation_function(node)
     ############## make legend #############
-    legend_pos = np.max(box_node_collection.node_locations, axis=0)*1.1+np.array([0,0,1])*scale+np.array(legend_pos_shift)
+    legend_pos = np.array([ np.max(box_node_collection.node_locations[:,0]),
+                            np.min(box_node_collection.node_locations[:,1]),
+                            np.min(box_node_collection.node_locations[:,2])])
+    legend_pos = legend_pos+np.array(legend_pos_shift)*scale
     legend_atoms = []
     # sort accrding to position in name of cif_file
     atom_type_set = set(atom_types)
@@ -176,10 +183,11 @@ def add_crystal_structure( cif_file, scale = 4.0, rotation_function = None, lege
         objects.append(atom)
         atom *= scale
         atom += legend_pos
-        text = object_classes.Text(np.copy(atom.loc)+np.array([0,0,0.8])*scale, a_typ, color=[0,0,0,1], scale=0.9)
-        objects.append(text)
         atom+=np.array([-2*i,0,0])*scale
-        text+=np.array([-2*i,0,0])*scale
+        if show_text:
+            text = object_classes.Text(np.copy(atom.loc)+np.array([0,0,0.8])*scale, a_typ, color=[0,0,0,1], scale=0.9)
+            objects.append(text)
+            #text+=np.array([-2*i,0,0])*scale
     ############## shift axes #############
     if type(axes_shift) == type(None):
         origo = np.max(box_node_collection.node_locations, axis=0)*1.1+np.array([0,0,2])*scale

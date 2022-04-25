@@ -3,543 +3,287 @@ import copy
 import three_d_draw_object_classes as object_classes
 import time
 import streamlit as st
+import scipy.optimize
 
-def set_backend(backend):
-    '''
-    sets the backend in object_classes
-    input:
-        backend: string 'matplotlib' or 'mayavi'
-    '''
-    object_classes.set_backend(backend)
-    return
 
-t0=time.time()
-timing=False
-timing_render=False
-def print_time(text=''):
-    if timing:
-        global t0
-        print(round((time.time()-t0)*100)/100, text)
-        t0 = time.time()
-def print_time_render(text=''):
-    if timing_render:
-        global t0
-        print(round((time.time()-t0)*100)/100, text)
-        t0 = time.time()
-def set_edge_to_const(mat, border_val):
-    '''
-    sets the outer edges of mat to value
-    input:
-        mat: 3d numpy array
-        border_val: float
-    returns:
-        mat
-    '''
-    mat[0,:,:] = border_val
-    mat[:,0,:] = border_val
-    mat[:,:,0] = border_val
-    mat[-1,:,:] = border_val
-    mat[:,-1,:] = border_val
-    mat[:,:,-1] = border_val
-    return mat
-
-def make_3d_perspective(ex,
-                fig=None, ax=None, export_blender_filepath=None,
+def make_3d_perspective(params, export_blender_filepath=None,
                 # deals with rendering the figure
-                view_angle = 3, fig_size=None, tilt_to_vector = None,
-                factor = 2000, final_rotation_function = None,
+                crystal_rotation_function = None,
                 scale = 0.1,
+                tilt_to_vector = None,
                 # deals with additional objects to render
-                volume_data = None,
                 atom_list = None, crysta_structure_position = [-70, -10, 60],
-                beam_draw_mesh = True,
-                extend_beam = (1,0), beam_step_size = 1, beam_opacity = 1,
-                extend_imaging_system=(0,1), imaging_system_lw = 1,
-                draw_scattered_beam = True, scattered_beam_lw =0,
+                extend_beam = (1000,0), beam_opacity = 1,
+                extend_imaging_system=(0,1000), imaging_system_lw = 1,
+                draw_scattered_beam = True,
                 lens_scale = 0,
                 bounding_box_facecolor = [0,0,0,0.3],
-                # image at the end of the imaging system
-                intensity_imaging_system = None,
-                intensity_imaging_system_opacity = None,
-                # detector
-                detector_map = None,
-                #extend_detector = None,
-                #detector_intensity = None,
-                show_beam_at_end = False,
                 # stages and arrows
                 draw_stage = False,
                 draw_axes = True,
                 draw_scattering_arrows = True,
-                draw_face_axes = False, crystal_rotation_function = None,
-                draw_curved_arrows = False,
                 # misc
-                img_colormap = 'viridis',
                 arrow_nodes_per_circle=12,
+                show_text = True,
                 ):
     '''
     Makes a matplotlib figure illustrating the experiment
     input:
-        ex: DFXRM experiment object
-        fig: optional, matplotlib or mayavi figure. A new figure is created if None
-        ax: matlotlib axis, or None
-        scale: float default = 1.0, multiplication factor for the simulated volume
-        volume_data: optional list of meshes to be visualized. list of object_classes.Mesh objects
-        beam_step_size: optional int,  step size for calculating triangle mesh of the beam
-        beam_opacity: opacity of the beam
-        intensity_imaging_system: 2d image data to show at the end of the the projected imaging system (intensity corresponding to ex.Eh_detector)
-        intensity_imaging_system_opacity: opacity data of the above used in blender
-        show_beam_at_end: optional bool, if True, show a pcolormesh of beam at end'
-        view_angle: mayavi view angle, optional
-        fig_size: size of the figure, in inches for matplotlib, or pixels for mayavi
+        params: dictionary specifying the geometry
+        export_blender_filepath: string, optional filepath for blender export. Default None
+
+        crystal_rotation_function: function tha takes an array of lenght three describing a vector in the crystal basis, and returns the vector in simulation coordiantes
+        scale: float default = 0.1, multiplication factor for the simulated volume
         tilt_to_vector: vector of lenght 3 that defines 'up' or none
-        extend_beam: tuple or None, default (1,0). The beam is extended in (before, after) directions along the [001] axis equal to this value times the cell lenght along [001]
+
+        atom_list: None or list of atoms and other objects to render crystal structure
+        crysta_structure_position: position to render the crystal strcuture (with respect to the volume center of the simulated volume. This is in the coordinate system of the drawing: [horizontal, vertical, out-of-plane]
+        extend_beam: tuple or None, default (1000,0). The beam is extended in (before, after) directions along the [001] axis equal to this value
                     If None, the beam is not shown
-        extend_imaging_system: tuple (forward,back), default = (5,5). The integrated field projection is extended in both directions along the [001] axis equal to this value times the cell lenght along [001].
+        beam_opacity: opacity of the beam
+        extend_imaging_system: tuple (forward,back), default = (0,1000). The integrated field projection is extended in both directions along the [001] axis equal to this value.
                         It is invisible ulness imaging_system_lw is also set.
-                        also determines the posistion of lenses, intensity_imaging_system, and detector_map
+                        also determines the posistion of lenses, and detector_map
         imaging_system_lw: float, default is 0, linewith of the box of extended intensity
         draw_scattered_beam: bool default True, if true draws the scattered beam
-        scattered_beam_lw: linewidth to draw the edges of the scattered beam
-        extend_detector: float or None, default = None. The detector projection is extended in both directions along the [001] axis equal to this value times the cell lenght along [001]
-        export_blender_filepath: string, optional filepath for blender export. Default None
+        lens_scale: float, default=0, scale to render the lens in. If 0, do not show the lens
+        bounding_box_facecolor: color of the sample bounding box, [r,g,b,a]
+
         draw_stage: bool default False. If True, draw the stage
         draw_axes: bool default True. If False, do not draw the arrows indicating the sample geometry
         draw_scattering_arrows: bool default True. If False, do not draw the arrows indicating the scattering vector
-        draw_face_axes: bool default False. If True, draw the arrows indicating the sample geometry at the facets
-        draw_curved_arrows: bool default True. If False, do not draw the arrows corresponding to rotation
+
         arrow_nodes_per_circle: int default 12. Nodes per circel when drawing arrwos
-        atom_list: None or list of atoms and other objects to render crystal structure
-        crysta_structure_position: position to render the crystal strcuture (with respect to the volume center of the simulated volume. This is in the coordinate system of the drawing: [horizontal, vertical, out-of-plane]
-        factor: float, default 200. Distance from camera to structure. High number: parallel projection
-        final_rotation_function: optional default None. If not None, should be a function like:
-            def final_rotation_function(drawing):
-                drawing.rot_y(-90*np.pi/180) # y in coordinate system of drawing is vertical
-                drawing.rot_x(100*np.pi/180) # x in coordinate system of drawing is horizontal
-                drawing.rot_z(-20*np.pi/180) # z in coordinate system of drawing is out of plane
-                return
-        img_colormap: string, default 'viridis', colormap to use when rendering images, a sting as accepted by mayavi/matplotlib
-        lens_scale: float, default=0, scale to render the lens in. If 0, do not show the lens
-        detector_map: map containing 'pixel_size', 'y_axis', 'x_axis' and 'intensity' draws the image on the detector at the location given by extend_imaging_system
-        crystal_rotation_function: function tha takes an array of lenght three describing a vector in the crystal basis, and returns the vector in simulation coordiantes
+        show_text: if True, show text
     returns:
         drawing, fig, ax
     '''
     outstr = []
-    if timing:
-        global t0
-        t0 = time.time()
-    if object_classes.backend == 'matplotlib':
-        print(' Using matplotlib backend, objects are rendered as layers, and do not intersect correctly.')
-        if type(fig) == type(None):
-            if type(fig_size) == type(None):
-                fig_size = (12,10)
-            import matplotlib.pyplot as plt
-            fig, ax = plt.subplots(1,1,figsize=fig_size, dpi=100)
-    elif object_classes.backend == 'mayavi':
-        if type(fig) == type(None):
-                import mayavi.mlab
-                mayavi.mlab.options.offscreen = True
-                if type(fig_size) == type(None):
-                    fig_size = (12,6)
-                fig_size = (fig_size[0]*200, fig_size[1]*200)
-                fig = mayavi.mlab.figure(bgcolor=(1,1,1), fgcolor=None, engine=None, size=fig_size)
-                fig.scene.disable_render = True # supress rendering after each object is added. Set to False at end
-                ax = fig
-    elif object_classes.backend == 'plotly':
-        ax = {} # <- this list will be populated by plotly objects
-        ax['data'] = []
-        ax['annotations'] = []
-        fig = None
-    print_time('# add drawing')
+    ax = {} # <- this list will be populated by plotly objects
+    ax['data'] = []
+    ax['annotations'] = []
+
     drawing = Drawing()
     # add crystal structure if cif specified
     if not type(atom_list) == type(None):
-        print_time('# add crystal structure')
         crystal_structure = drawing.add_atom_list(atom_list)
     # add simulated box
-    print_time('# add simulated box')
-    box_shape = ex.shape*ex.del_x*scale
+    box_shape = params['shape']*scale
     box_nodes, _, __ = drawing.add_box(box_shape, [0,0,0], meshcolor=[0,0,0,1], linewidth = 2, facecolor=bounding_box_facecolor, abscolor = False)
     # text box size
-    print_time('# text box size')
-    drawing.add_text([0,1+0.5*box_shape[1],1+0.5*box_shape[2]], f'{box_shape[0]/scale:.2f} µm')
-    drawing.add_text([1+0.5*box_shape[0],0,1+0.5*box_shape[2]], f'{box_shape[1]/scale:.2f} µm')
-    drawing.add_text([3+0.5*box_shape[0],-0.5*box_shape[1],-8], f'{box_shape[2]/scale:.2f} µm')
+    if show_text:
+        drawing.add_text([0,1+0.5*box_shape[1],1+0.5*box_shape[2]], f'{box_shape[0]/scale:.2f} µm')
+        drawing.add_text([1+0.5*box_shape[0],0,1+0.5*box_shape[2]], f'{box_shape[1]/scale:.2f} µm')
+        drawing.add_text([3+0.5*box_shape[0],-0.5*box_shape[1],-8], f'{box_shape[2]/scale:.2f} µm')
 
-    # beam at end
-    print_time('# beam at end')
-    if show_beam_at_end:
-        beam_at_end = np.abs( np.fft.ifft2( np.fft.fft2(ex.E0_entrance[...,0]) * np.exp(-2j*np.pi*ex.L/ex.k0_vector[2]*(ex.qx*ex.k0_vector[0] + ex.qy*ex.k0_vector[1])) )  )**2
-        pcolormesh = object_classes.QuadrilateralColormesh(box_nodes, [4,5,6,7], beam_at_end, colormap = img_colormap)
-        drawing.objects.append(pcolormesh)
     # add projection of integration
     #if not type(extend_imaging_system) == type(None):
-    print_time('# add projection of integrated field')
     if 1: # always make this, but sometimes it is hidden depending on imaging_system_lw
         det_projection_nodes, _, __ = drawing.add_box(box_shape*np.array([1,1,0]), [0,0,0],
                                                         meshcolor=[0,0,0,1], linewidth = imaging_system_lw, facecolor=[0,0,0,0], abscolor = False)
         node_locs = det_projection_nodes.node_locations
-        kh_norm = ex.kh_vector/np.sqrt(np.sum(ex.kh_vector**2))
+        kh_norm = params['k0_vector']/np.sqrt(np.sum(params['k0_vector']**2))
         node_locs[:,:] -= np.sum(node_locs*kh_norm[np.newaxis,:], axis=1)[:,np.newaxis]*kh_norm[np.newaxis,:]
-        node_locs[:4,:] -= box_shape[2]*(1+extend_imaging_system[0])*kh_norm[np.newaxis,:]/kh_norm[2]
-        node_locs[4:,:] += box_shape[2]*extend_imaging_system[1]*kh_norm[np.newaxis,:]/kh_norm[2]
+        node_locs[:4,:] -= (box_shape[2]+extend_imaging_system[0])*kh_norm[np.newaxis,:]/kh_norm[2]
+        node_locs[4:,:] += extend_imaging_system[1]*kh_norm[np.newaxis,:]/kh_norm[2]
         node_locs[:,2] += 0.5*box_shape[2]
-    if draw_scattered_beam:
-        # add projection from beam intersection
-        #z_vec = np.array([0,0,1])
-        #beam_y = np.cross(ex.Q_vector,z_vec)
-        #beam_y = beam_y/np.sqrt(np.sum(beam_y**2))
+    # add beam
+    if not type(extend_beam) == type(None):
         node_locs = np.zeros((8,3))
 
-        surface_angle = -np.arctan2(ex.k0_vector[1], -ex.k0_vector[0])
-        mid_point = ex.params['BEAM']['mid'] # mid in relative units
-        mid_point = [mid_point[0] * ex.shape[0]*ex.del_x[0], mid_point[1] * ex.shape[1]*ex.del_x[1]]
+        surface_angle = -np.arctan2(params['k0_vector'][1], -params['k0_vector'][0])
+        mid_point = params['mid'] # mid in relative units
+        mid_point = [mid_point[0] * params['shape'][0], mid_point[1] * params['shape'][1]]
+
+        thickness_offset = normalize(np.cross(np.array([-np.sin(surface_angle),np.cos(surface_angle),0]), params['k0_vector']))
+        thickness_offset *= params['beam_thickness']
+        #thickness_offset *= 0.2/np.sqrt(np.sum(thickness_offset**2))
+        # front intesection of beam
+        beam_with_dir = np.cross(params['Q_vector'],params['k0_vector'])
+        beam_with_dir /= np.sqrt(np.sum(beam_with_dir**2))
+        beam_loc_0 = beam_with_dir*params['transverse_width']*0.5
+        node_locs[0,0] = np.cos(surface_angle)*(-0.5*params['shape'][0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*params['shape'][1]+mid_point[1])+beam_loc_0[0]
+        node_locs[0,1] = np.cos(surface_angle)*(-0.5*params['shape'][1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*params['shape'][0]+mid_point[0])+beam_loc_0[1]
+        node_locs[0,2] = beam_loc_0[2]
+        node_locs[0,:] *= scale
+        node_locs[1,0] = np.cos(surface_angle)*(-0.5*params['shape'][0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*params['shape'][1]+mid_point[1])-beam_loc_0[0]
+        node_locs[1,1] = np.cos(surface_angle)*(-0.5*params['shape'][1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*params['shape'][0]+mid_point[0])-beam_loc_0[1]
+        node_locs[1,2] = -beam_loc_0[2]
+        node_locs[1,:] *= scale
+
+        node_locs[2,:] = node_locs[1,:]
+        node_locs[3,:] = node_locs[0,:]
+        # back intersection of beam
+        node_locs[4,:] = node_locs[0,:] + box_shape[2]*params['k0_vector']/params['k0_vector'][2]
+        node_locs[5,:] = node_locs[1,:] + box_shape[2]*params['k0_vector']/params['k0_vector'][2]
+        node_locs[6,:] = node_locs[5,:]
+        node_locs[7,:] = node_locs[4,:]
+        # shift
+        node_locs[:4,:] += -extend_beam[0]*params['k0_vector'][np.newaxis,:]/params['k0_vector'][2]
+        node_locs[4:,:] += extend_beam[1]*params['k0_vector'][np.newaxis,:]/params['k0_vector'][2]
+        node_locs[[0,1,4,5],:] += 0.5*thickness_offset
+        node_locs[[2,3,6,7],:] -= 0.5*thickness_offset
+        node_locs[:,:] += -0.5*box_shape[2]*np.array([0,0,1])
+
+        box_node_collection = object_classes.NodeCollection(node_locs)
+        drawing.nodes.append(box_node_collection)
+        if 1:
+            for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
+                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
+
+        #drawing.objects.append(object_classes.BoxFacet(box_node_collection, [0,1,2,3], facecolor = [1,0.6,0,beam_opacity*2], abscolor=False))
+        #drawing.objects.append(object_classes.BoxFacet(box_node_collection, [0,1,2,3], facecolor = [1,0.6,0,beam_opacity*2], abscolor=False))
+
+    if draw_scattered_beam:
+        # add projection from beam intersection
+        node_locs = np.zeros((8,3))
+
+        surface_angle = -np.arctan2(params['k0_vector'][1], -params['k0_vector'][0])
+        mid_point = params['mid'] # mid in relative units
+        mid_point = [mid_point[0] * params['shape'][0], mid_point[1] * params['shape'][1]]
 
         #xr = np.cos(surface_angle)*(x -mid_point[0]) - np.sin(surface_angle)*(y -mid_point[1])
         #yr = np.cos(surface_angle)*(y -mid_point[1]) + np.sin(surface_angle)*(x -mid_point[0])
         #xr = xr / np.cos(incidence_angle)
-        #incidence_angle = np.arccos(ex.k0_vector[2]/np.linalg.norm(ex.k0_vector))
+        #incidence_angle = np.arccos(params['k0_vector'][2]/np.linalg.norm(params['k0_vector']))
         # front intesection of beam
-        beam_with_dir = np.cross(ex.Q_vector,ex.k0_vector)
+        beam_with_dir = np.cross(params['Q_vector'],params['k0_vector'])
         beam_with_dir /= np.sqrt(np.sum(beam_with_dir[0:3]**2))
         incidence_angle = np.arcsin(beam_with_dir[2])
-        beam_loc_0 = beam_with_dir*ex.params['BEAM']['transverse_width']/np.cos(incidence_angle)**2
-        node_locs[0,0] = np.cos(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1])+beam_loc_0[0]
-        node_locs[0,1] = np.cos(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0])+beam_loc_0[1]
+        beam_loc_0 = beam_with_dir*params['transverse_width']*0.5/np.cos(incidence_angle)**2
+        node_locs[0,0] = np.cos(surface_angle)*(-0.5*params['shape'][0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*params['shape'][1]+mid_point[1])+beam_loc_0[0]
+        node_locs[0,1] = np.cos(surface_angle)*(-0.5*params['shape'][1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*params['shape'][0]+mid_point[0])+beam_loc_0[1]
         node_locs[0,:] *= scale
-        node_locs[1,0] = np.cos(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1])-beam_loc_0[0]
-        node_locs[1,1] = np.cos(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0])-beam_loc_0[1]
+        node_locs[1,0] = np.cos(surface_angle)*(-0.5*params['shape'][0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*params['shape'][1]+mid_point[1])-beam_loc_0[0]
+        node_locs[1,1] = np.cos(surface_angle)*(-0.5*params['shape'][1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*params['shape'][0]+mid_point[0])-beam_loc_0[1]
         node_locs[1,:] *= scale
 
         node_locs[1,:] = node_locs[1,:]
         # back intersection of beam
-        node_locs[2,:] = node_locs[1,:] + box_shape[2]*ex.k0_vector/ex.k0_vector[2]
-        node_locs[3,:] = node_locs[0,:] + box_shape[2]*ex.k0_vector/ex.k0_vector[2]
+        node_locs[2,:] = node_locs[1,:] + box_shape[2]*params['k0_vector']/params['k0_vector'][2]
+        node_locs[3,:] = node_locs[0,:] + box_shape[2]*params['k0_vector']/params['k0_vector'][2]
         # upper projected nodes
-        node_locs[4,:] = node_locs[0,:] + box_shape[2]*ex.kh_vector/ex.kh_vector[2]
-        node_locs[5,:] = node_locs[1,:] + box_shape[2]*ex.kh_vector/ex.kh_vector[2]
+        node_locs[4,:] = node_locs[0,:] + box_shape[2]*params['kh_vector']/params['kh_vector'][2]
+        node_locs[5,:] = node_locs[1,:] + box_shape[2]*params['kh_vector']/params['kh_vector'][2]
         # bottom projected nodes
-        node_locs[6,:] = node_locs[1,:] + box_shape[2]*ex.k0_vector/ex.k0_vector[2]
-        node_locs[7,:] = node_locs[0,:] + box_shape[2]*ex.k0_vector/ex.k0_vector[2]
+        node_locs[6,:] = node_locs[1,:] + box_shape[2]*params['k0_vector']/params['k0_vector'][2]
+        node_locs[7,:] = node_locs[0,:] + box_shape[2]*params['k0_vector']/params['k0_vector'][2]
         # extend back end of box to the detector
-        node_locs[4:,:] += box_shape[2]*extend_imaging_system[1]*ex.kh_vector[np.newaxis,:]/ex.kh_vector[2]
+        node_locs[4:,:] += extend_imaging_system[1]*params['kh_vector'][np.newaxis,:]/params['kh_vector'][2]
         node_locs[:,:] += -0.5*box_shape[2]*np.array([0,0,1])
+        '''
+        if lens_scale > 0
+            explode_0 = 10*lens_scale*normalize(np.cross(params['Q_vector'],params['kh_vector']))
+            explode_1 = (10*lens_scale+scale*params['transverse_width'])*normalize(np.cross(explode_0, params['kh_vector']))
+            sample_in_lens = np.copy(node_locs[4:])
+            node_locs[4,:] +=  explode_0-explode_1
+            node_locs[5,:] += -explode_0-explode_1
+            node_locs[6,:] += -explode_0+explode_1
+            node_locs[7,:] +=  explode_0+explode_1
+            sample_exploded_in_lens = np.copy(node_locs[4:])'''
         # make object
         box_node_collection = object_classes.NodeCollection(node_locs)
         drawing.nodes.append(box_node_collection)
-        # add faces
-        if 1:
+        # collapse to lens?
+        if lens_scale > 0:
             for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
-                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
-        # add lines
-        if scattered_beam_lw >0:
-            for seg in [[0,1], [1,2], [2,3], [3,0], [4,5], [5,6],[6,7], [7,4], [0,4], [1,5], [2,6], [3,7]]:
-                drawing.objects.append(object_classes.BoxLine(box_node_collection, seg, meshcolor = [0,0,0,1], linewidth = scattered_beam_lw))
-
-    if not type(detector_map) == type(None):
-        print_time('# add detector')
-        extend_detector = extend_imaging_system[1]
-        node_locs = np.array(
-            [[0, 0, 0.5*box_shape[2]*(1+2*extend_detector)]]*4,
-            )
-        #print(node_locs)
-
-        # project along kh
-        node_locs[:,1] +=  (node_locs[:,2]-0.5*box_shape[2])*ex.kh_vector[1]/ex.kh_vector[2] # *np.cos((ex.theta-angle_Q_z_axis))*np.sin(angle_Q_projceted_XY_wrtY)
-        node_locs[:,0] +=  (node_locs[:,2]-0.5*box_shape[2])*ex.kh_vector[0]/ex.kh_vector[2]# *np.cos((ex.theta-angle_Q_z_axis))*np.cos(angle_Q_projceted_XY_wrtY)
-        node_locs /= scale
-        # move nodes according to x and y axis of detector
-        detector_shape = np.array([detector_map['x_axis']*detector_map['pixel_size'][0]*detector_map['intensity'].shape[0],
-                                   detector_map['y_axis']*detector_map['pixel_size'][1]*detector_map['intensity'].shape[0]])
-        if 'scale' in detector_map.keys():
-           detector_shape *= detector_map['scale']
-        if 'render_scale' in detector_map:
-            detector_shape = detector_map['render_scale']*detector_shape
-        node_locs[0] += 0.5*(-detector_shape[0]-detector_shape[1])
-        node_locs[1] += 0.5*( detector_shape[0]-detector_shape[1])
-        node_locs[2] += 0.5*( detector_shape[0]+detector_shape[1])
-        node_locs[3] += 0.5*(-detector_shape[0]+detector_shape[1])
-        node_locs*= scale
-        node_locs = object_classes.NodeCollection(node_locs)
-        drawing.nodes.append(node_locs)
-        pcolormesh = object_classes.QuadrilateralColormesh(node_locs, [0,1,2,3],
-                detector_map['intensity'], opacity_data = intensity_imaging_system_opacity, colormap = img_colormap)
-        drawing.objects.append(pcolormesh)
-
-    '''# add projection of detector
-    if not type(extend_detector) == type(None):
-        ## get detector geometry
-        print_time('# add projection of detector')
-        fov_center = np.array(ex.params['DETECTOR']['fov_center'])
-        shape_detec = np.array(ex.params['DETECTOR']['shape'], dtype='int')
-        M = float(ex.params['DETECTOR']['magnif'])
-        del_x_detec = np.array(ex.params['DETECTOR']['pix_size']) / M
-        detector_shape = (shape_detec[0]*del_x_detec[0], shape_detec[1]*del_x_detec[1])
-        invm = np.linalg.inv(ex.M_imag)
-        # make detector box
-        det_detector_nodes, _, __ = drawing.add_box((1,1,1), (0,0,0), angle_vector=np.array([0,0,0]), meshcolor=[0,0,0,1], linewidth = 0.2, facecolor=[0,0,0,0], abscolor = False)
-        det_detector_nodes.node_locations *= scale
-        node_locs = det_detector_nodes.node_locations
-        # move nodes in box in the x-y plane
-        det_x_r = invm[0,0] * node_locs[:,0] + invm[0,1] * node_locs[:,1] # r = rotated and transformed
-        det_y_r = invm[1,0] * node_locs[:,0] + invm[1,1] * node_locs[:,1]
-        node_locs[:,0] = (det_x_r*detector_shape[0]+ex.shape[0]*(fov_center[0]-0.5))*ex.del_x[0] # rescale and center detector projection
-        node_locs[:,1] = (det_y_r*detector_shape[1]+ex.shape[1]*(fov_center[1]-0.5))*ex.del_x[1]
-        node_locs[:,2] = node_locs[:,2] * ex.shape[2] * ex.del_x[2] * (1+2*extend_detector)
-        # transpose according to angle of kh_vector
-        print_time('# transpose according to angle of kh_vector')
-        node_locs[:,1] +=  (node_locs[:,2]-0.5*box_shape[2])*ex.kh_vector[1]/ex.kh_vector[2]
-        node_locs[:,0] +=  (node_locs[:,2]-0.5*box_shape[2])*ex.kh_vector[0]/ex.kh_vector[2]
-        # move nodes to the plane of the detector (i.e the ex.Q_vector-np.cross(ex.kh_vector, ex.Q_vector ) plane)
-        detector_normal = np.cross( ex.Q_vector, np.cross( ex.kh_vector, ex.Q_vector ))
-        detector_normal = detector_normal/np.sqrt(np.sum(detector_normal**2))
-        k_h_norm = ex.kh_vector/np.sqrt(np.sum(ex.kh_vector**2))
-        for plane in [0,4]:
-            for i in [0,2,3]:
-                dist = np.dot((node_locs[i+plane,:]-node_locs[1+plane,:]),detector_normal)
-                node_locs[i+plane,:] -= dist*k_h_norm'''
-    # add beam
-    if not type(extend_beam) == type(None):
-        print_time('# add beam')
-        if beam_draw_mesh:
-            input_beam = np.zeros((*(ex.E0_entrance[:,:,0].shape),beam_step_size*2))
-            for i in range(input_beam.shape[-1]):
-                input_beam[:,:,i]= ex.E0_entrance[:,:,0].real
-            beam_level = 0.5*np.max(input_beam)
-            # beam is splitt to improve rendering for the matplotlib backend, but is not needed for mayavi, but do it anyway ¯\_(ツ)_/¯
-            # beam outside (enterence)
-            mesh  = drawing.add_isosurface_mesh(isosurface_mesh_from_matrix(input_beam, level = beam_level,
-                                    step_size = beam_step_size, del_x = ex.del_x, meshcolor=[0,0,0,0], facecolor=[1,0.6,0,beam_opacity], abscolor=True))
-            vertices = mesh.node_locations
-            vertices[:,2] -= np.average([np.max(vertices[:,2]),np.min(vertices[:,2])])
-            vertices[:,2] *= 0.5*ex.del_x[2]*ex.shape[2]/np.max(vertices[:,2])
-            vertices[:,2] =  (vertices[:,2]*extend_beam[0]-(0.5+extend_beam[0]/2)*ex.del_x[2]*ex.shape[2]) # shift to front
-            vertices[:,1] += (vertices[:,2] + 0.5*ex.del_x[2]*ex.shape[2])*ex.k0_vector[1]/ex.k0_vector[2]
-            vertices[:,0] += (vertices[:,2] + 0.5*ex.del_x[2]*ex.shape[2])*ex.k0_vector[0]/ex.k0_vector[2]
-            vertices *= scale
-            # beam inside
-            mesh  = drawing.add_isosurface_mesh(isosurface_mesh_from_matrix(input_beam, level = beam_level,
-                                    step_size = beam_step_size, del_x = ex.del_x, meshcolor=[0,0,0,0], facecolor=[1,0.6,0,beam_opacity], abscolor=True))
-            vertices = mesh.node_locations
-            vertices[:,2] -= np.average([np.max(vertices[:,2]),np.min(vertices[:,2])])
-            vertices[:,2] *= 0.5*ex.del_x[2]*ex.shape[2]/np.max(vertices[:,2])
-            vertices[:,1] += (vertices[:,2] + 0.5*ex.del_x[2]*ex.shape[2])*ex.k0_vector[1]/ex.k0_vector[2]
-            vertices[:,0] += (vertices[:,2] + 0.5*ex.del_x[2]*ex.shape[2])*ex.k0_vector[0]/ex.k0_vector[2]
-            vertices *= scale
-            # beam outside other end (exit)
-            mesh  = drawing.add_isosurface_mesh(isosurface_mesh_from_matrix(input_beam, level = beam_level,
-                                    step_size = beam_step_size, del_x = ex.del_x, meshcolor=[0,0,0,0], facecolor=[1,0.6,0,beam_opacity], abscolor=True))
-            vertices = mesh.node_locations
-            vertices[:,2] -= np.average([np.max(vertices[:,2]),np.min(vertices[:,2])])
-            vertices[:,2] *= 0.5*ex.del_x[2]*ex.shape[2]/np.max(vertices[:,2])
-            vertices[:,2] =  (vertices[:,2]*extend_beam[1]+(0.5+extend_beam[1]/2)*ex.del_x[2]*ex.shape[2]) # shift to back
-            vertices[:,1] += (vertices[:,2] + 0.5*ex.del_x[2]*ex.shape[2])*ex.k0_vector[1]/ex.k0_vector[2]
-            vertices[:,0] += (vertices[:,2] + 0.5*ex.del_x[2]*ex.shape[2])*ex.k0_vector[0]/ex.k0_vector[2]
-            vertices *= scale
-        else: # draw the beam as a plane line
-            #z_vec = np.array([0,0,1])
-            #beam_y = np.cross(ex.Q_vector,z_vec)
-            #beam_y = beam_y/np.sqrt(np.sum(beam_y**2))
-            node_locs = np.zeros((8,3))
-
-            surface_angle = -np.arctan2(ex.k0_vector[1], -ex.k0_vector[0])
-            mid_point = ex.params['BEAM']['mid'] # mid in relative units
-            mid_point = [mid_point[0] * ex.shape[0]*ex.del_x[0], mid_point[1] * ex.shape[1]*ex.del_x[1]]
-
-            thickness_offset = np.cross(np.array([-np.sin(surface_angle),np.cos(surface_angle),0]), ex.k0_vector)
-            thickness_offset *= 0.2/np.sqrt(np.sum(thickness_offset**2))
-            # front intesection of beam
-            beam_with_dir = np.cross(ex.Q_vector,ex.k0_vector)
-            beam_with_dir /= np.sqrt(np.sum(beam_with_dir**2))
-            beam_loc_0 = beam_with_dir*ex.params['BEAM']['transverse_width']
-            node_locs[0,0] = np.cos(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1])+beam_loc_0[0]
-            node_locs[0,1] = np.cos(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0])+beam_loc_0[1]
-            node_locs[0,2] = beam_loc_0[2]
-            node_locs[0,:] *= scale
-            node_locs[1,0] = np.cos(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1])-beam_loc_0[0]
-            node_locs[1,1] = np.cos(surface_angle)*(-0.5*ex.shape[1]*ex.del_x[1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*ex.shape[0]*ex.del_x[0]+mid_point[0])-beam_loc_0[1]
-            node_locs[1,2] = -beam_loc_0[2]
-            node_locs[1,:] *= scale
-
-            node_locs[2,:] = node_locs[1,:]
-            node_locs[3,:] = node_locs[0,:]
-            # back intersection of beam
-            node_locs[4,:] = node_locs[0,:] + box_shape[2]*ex.k0_vector/ex.k0_vector[2]
-            node_locs[5,:] = node_locs[1,:] + box_shape[2]*ex.k0_vector/ex.k0_vector[2]
-
-            node_locs[6,:] = node_locs[5,:]
-            node_locs[7,:] = node_locs[4,:]
-            # shift
-            node_locs[:4,:] += -box_shape[2]*extend_beam[0]*ex.k0_vector[np.newaxis,:]/ex.k0_vector[2]
-            node_locs[4:,:] += box_shape[2]*extend_beam[1]*ex.k0_vector[np.newaxis,:]/ex.k0_vector[2]
-            node_locs[[0,1,4,5],:] += 0.5*thickness_offset
-            node_locs[[2,3,6,7],:] -= 0.5*thickness_offset
-            node_locs[:,:] += -0.5*box_shape[2]*np.array([0,0,1])
-
+                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,0.2], abscolor=False))
+            sample_in_lens = np.copy(node_locs[4:])
+            node_locs[4:,:] = 0.01*node_locs[4:,:] +0.99*np.average(node_locs[4:,:], axis = 0)[np.newaxis, :]
+            sample_compressed_in_lens = np.copy(node_locs[4:])
             box_node_collection = object_classes.NodeCollection(node_locs)
             drawing.nodes.append(box_node_collection)
-            if 1:
-                for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
-                    drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
+            for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
+                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
+        else:
+            for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
+                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
 
-            #drawing.objects.append(object_classes.BoxFacet(box_node_collection, [0,1,2,3], facecolor = [1,0.6,0,beam_opacity*2], abscolor=False))
-            #drawing.objects.append(object_classes.BoxFacet(box_node_collection, [0,1,2,3], facecolor = [1,0.6,0,beam_opacity*2], abscolor=False))
-
-
-    # add internals
-    print_time('# add internals')
-    if not type(volume_data) == type(None):
-        for mesh in volume_data:
-            mesh.node_locations *= scale
-            drawing.add_isosurface_mesh(mesh)
-        '''vetices_list, faces_list = make_isosurface_and_get_vertice_collections(volume_data, level = volume_level, step_size = volume_step_size)
-        for vertices, faces, i in zip(vetices_list, faces_list, range(len(faces_list))):
-            vertices = vertices*ex.del_x-0.5*(ex.shape*ex.del_x) #scale to shape of box and center on zero
-            drawing.add_mesh(vertices, faces, meshcolor=[0,0,0,0], facecolor=[0.8,0.2,0,0.1], abscolor=True)'''
 
     #lens
     if lens_scale>0:
-        lens_radius = lens_scale*0.5*np.sqrt(2)*scale*np.max([ex.del_x[0]*ex.shape[0],ex.del_x[1]*ex.shape[1]])
-        lens_pos = [0, 0, 0.5*scale*0.5*ex.del_x[2]*ex.shape[2]*(1+2*extend_imaging_system[1])]
-        lens_pos[0] +=  (lens_pos[2]-0.5*box_shape[2])*ex.kh_vector[0]/ex.kh_vector[2]
-        lens_pos[1] +=  (lens_pos[2]-0.5*box_shape[2])*ex.kh_vector[1]/ex.kh_vector[2]
+        magnification = 3
+        lens_radius = lens_scale*0.5*np.sqrt(2)*scale*np.max([params['shape'][0],params['shape'][1]])
+        lens_pos = [0, 0, (extend_imaging_system[1])]
+        lens_pos[0] +=  (lens_pos[2]-0.5*box_shape[2])*params['kh_vector'][0]/params['kh_vector'][2]
+        lens_pos[1] +=  (lens_pos[2]-0.5*box_shape[2])*params['kh_vector'][1]/params['kh_vector'][2]
         r_curvature = lens_radius*3
 
-        delta_lens = ex.kh_vector/np.sqrt(np.sum(ex.kh_vector**2))
+        delta_lens = params['kh_vector']/np.sqrt(np.sum(params['kh_vector']**2))
         delta_lens*= 1.1*2*(r_curvature-np.sqrt(r_curvature**2-lens_radius**2))
-        num_lenses = 3
+        num_lenses = 10
         for i in np.arange(num_lenses):
             i-= (num_lenses-1)/2-1
             drawing.add_lens(radius = lens_radius, num_links = 15, r_curvature = r_curvature,
-                    facing = -ex.kh_vector, displacement = lens_pos+delta_lens*i)
+                    facing = -params['kh_vector'], displacement = lens_pos + delta_lens*i)
 
-    # add integrated image
-    print_time('# add integrated image')
-    if not type(intensity_imaging_system)==type(None):
-        pcolormesh = object_classes.QuadrilateralColormesh(det_projection_nodes, [4,5,6,7],
-                                    intensity_imaging_system, opacity_data = intensity_imaging_system_opacity, colormap = img_colormap)
-        drawing.objects.append(pcolormesh)
-    # add detector image
-    '''if not type(detector_intensity)==type(None):
-        pcolormesh = object_classes.QuadrilateralColormesh(det_detector_nodes, [4,5,6,7],
-                                    detector_intensity, colormap = img_colormap)
-        drawing.objects.append(pcolormesh)'''
+        # draw scattered from lens center to detector
+        node_locs = np.zeros((8,3))
+        node_locs[:4,:] = sample_compressed_in_lens
+        node_locs[4:,:] = sample_in_lens
+        node_locs[4:,:] += magnification*extend_imaging_system[1]*params['kh_vector'][np.newaxis,:]/params['kh_vector'][2]
+        explode_0 = normalize(np.cross(params['Q_vector'],params['kh_vector']))
+        explode_1 = normalize(np.cross(explode_0, params['kh_vector']))
+        for i in range(4,8):
+            node_locs[i,:] += (magnification-1)*(np.dot(node_locs[i,:],explode_0)*explode_0+np.dot(node_locs[i,:],explode_1)*explode_1)
 
-    # add Q arrow
+        box_node_collection = object_classes.NodeCollection(node_locs)
+        drawing.nodes.append(box_node_collection)
+        for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
+            drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
+
+        node_locs[0:4,:] = sample_in_lens
+        box_node_collection = object_classes.NodeCollection(node_locs)
+        drawing.nodes.append(box_node_collection)
+        for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
+            drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,0.2], abscolor=False))
+
     if draw_scattering_arrows:
         Q_arrows = []
-        Q_norm = ex.Q_vector/(np.sqrt(np.sum(ex.k0_vector**2))+np.sqrt(np.sum(ex.kh_vector**2)))
-        ar = drawing.add_arrow([0,0,0], Q_norm*9,color=[0,0,0,1],nodes_per_circle=arrow_nodes_per_circle,head_fraction = 0.45/1, rod_radius = 0.1, hat_radius = 0.25)
+        Q_norm = params['Q_vector']/(np.sqrt(np.sum(params['k0_vector']**2))+np.sqrt(np.sum(params['kh_vector']**2)))
+        ar = drawing.add_arrow([0,0,0], Q_norm*9*scale*100,color=[0,0,0,1],nodes_per_circle=arrow_nodes_per_circle,head_fraction = 0.45/1, rod_radius = 0.1, hat_radius = 0.25)
         Q_arrows.append(ar)
-        ar = drawing.add_text(Q_norm*9, 'Q')
-        Q_arrows.append(ar)
-        k0_norm = ex.k0_vector/np.sqrt(np.sum(ex.k0_vector**2))
-        ar = drawing.add_arrow(-k0_norm*4.5, [0,0,0],color=[0.5,0,0,1],nodes_per_circle=arrow_nodes_per_circle,head_fraction = 0.45/3, rod_radius = 0.1/3, hat_radius = 0.25/3)
+        if show_text:
+            ar = drawing.add_text(Q_norm*9*scale*100, 'Q')
+            Q_arrows.append(ar)
+        k0_norm = params['k0_vector']/np.sqrt(np.sum(params['k0_vector']**2))
+        ar = drawing.add_arrow(-k0_norm*4.5*scale*100, [0,0,0],color=[0.5,0,0,1],nodes_per_circle=arrow_nodes_per_circle,head_fraction = 0.45/3, rod_radius = 0.1/3, hat_radius = 0.25/3)
         k0_butt_node = ar.node_locations[0] # use this to rotate stage
         Q_arrows.append(ar)
-        ar = drawing.add_text(-k0_norm*4.5+np.array([1,0,0]), 'k0')
+        if show_text:
+            ar = drawing.add_text((-k0_norm*4.5+np.array([1,0,0]))*scale*100, 'k0')
+            Q_arrows.append(ar)
+        kh_norm = params['kh_vector']/np.sqrt(np.sum(params['kh_vector']**2))
+        ar = drawing.add_arrow([0,0,0], kh_norm*4.5*scale*100,color=[0.5,0,0,1],nodes_per_circle=arrow_nodes_per_circle,head_fraction = 0.45/3, rod_radius = 0.1/3, hat_radius = 0.25/3)
         Q_arrows.append(ar)
-        kh_norm = ex.kh_vector/np.sqrt(np.sum(ex.kh_vector**2))
-        ar = drawing.add_arrow([0,0,0], kh_norm*4.5,color=[0.5,0,0,1],nodes_per_circle=arrow_nodes_per_circle,head_fraction = 0.45/3, rod_radius = 0.1/3, hat_radius = 0.25/3)
-        Q_arrows.append(ar)
-        ar = drawing.add_text(kh_norm*4.5, 'kh')
-        Q_arrows.append(ar)
+        if show_text:
+            ar = drawing.add_text(kh_norm*4.5*scale*100, 'kh')
+            Q_arrows.append(ar)
 
-
-    ax_hkl = ['x','y','z']
-    if 0:
-        if not type(crystal_rotation_function) == type(None):
-            '''
-            we here calculat the vector of the sample suraces in the crystal basis
-            i.e. the inverse of crystal_rotation_function
-            (crystal_rotation_function gives a the rotation of the crystal vrt the sample geometry)
-            '''
-            rot_mat = np.stack((crystal_rotation_function(np.array([1.0,0,0])),
-                                crystal_rotation_function(np.array([0,1.0,0])),
-                                crystal_rotation_function(np.array([0,0,1.0])))).T
-            rot_mat_inv =  np.linalg.inv(rot_mat)
-            hkl_ax = vector_to_hkl(rot_mat_inv[:,0])
-            ax_hkl[0] += f' = [{hkl_ax[0]},{hkl_ax[1]},{hkl_ax[2]}]'
-            hkl_ax = vector_to_hkl(rot_mat_inv[:,1])
-            ax_hkl[1] += f' = [{hkl_ax[0]},{hkl_ax[1]},{hkl_ax[2]}]'
-            hkl_ax = vector_to_hkl(rot_mat_inv[:,2])
-            ax_hkl[2] += f' = [{hkl_ax[0]},{hkl_ax[1]},{hkl_ax[2]}]'
-    if draw_face_axes:
-        ar = drawing.add_arrow([0,0,0], [3,0,0],color=[1,0.1,0,1],nodes_per_circle=arrow_nodes_per_circle, angle_offset=0)
-        ar *= 30/8
-        ar += np.array([1,0,0])*box_shape[0]*0.5
-        ar = drawing.add_arrow([0,0,0], [0,3,0],color=[0,0.9,0.3,1],nodes_per_circle=arrow_nodes_per_circle)
-        ar *= 30/8
-        ar += np.array([0,1,0])*box_shape[1]*0.5
-        ar = drawing.add_arrow([0,0,0], [0,0,3],color=[0,0.1,1,1],nodes_per_circle=arrow_nodes_per_circle)
-        ar *= 30/8
-        ar += np.array([box_shape[0]*0.25,box_shape[1]*0.25,0]) # shift this to off-center
-        ar += np.array([0,0,1])*box_shape[2]*0.5
-        ar = drawing.add_text([2.9,0,0], ax_hkl[0])#'[100]')
-        ar *= 30/8
-        ar += np.array([1,0,0])*box_shape[0]*0.5
-        ar = drawing.add_text([-1.3,2.8,0.1], ax_hkl[1])#'[010]')
-        ar *= 30/8
-        ar += np.array([0,1,0])*box_shape[1]*0.5
-        ar = drawing.add_text([0,0,2.9], ax_hkl[2])#'[001]')
-        ar *= 30/8
-        ar += np.array([0,0,1])*box_shape[2]*0.5
-        ar += np.array([box_shape[0]*0.25,box_shape[1]*0.25,0]) # shift this to off-center
-
-    # add xyz arrows
-    if 0:
-        xyz_arrows = []
-        print_time('# add arrows')
-        ar = drawing.add_arrow([0,0,0], [0,0,3],color=[0,0.1,1,1],nodes_per_circle=arrow_nodes_per_circle)
-        xyz_arrows.append(ar)
-        ar = drawing.add_arrow([0,0,0], [0,3,0],color=[0,0.9,0.3,1],nodes_per_circle=arrow_nodes_per_circle)
-        xyz_arrows.append(ar)
-        ar = drawing.add_arrow([0,0,0], [3,0,0],color=[1,0.1,0,1],nodes_per_circle=arrow_nodes_per_circle, angle_offset=0)
-        xyz_arrows.append(ar)
-
-        ar = drawing.add_text([2.9,0,0], ax_hkl[0])#'[100]')
-        xyz_arrows.append(ar)
-        ar = drawing.add_text([-1.3,2.8,0.1], ax_hkl[1])#'[010]')
-        xyz_arrows.append(ar)
-        ar = drawing.add_text([0,0,2.9], ax_hkl[2])#'[001]')
-        xyz_arrows.append(ar)
 
     # add id06 axes
     if draw_axes:
         xyz_arrows = []
-        print_time('# add arrows')
-        ar = drawing.add_arrow([0,0,0], [0,0,3],color=[1,0.1,0,1],nodes_per_circle=arrow_nodes_per_circle)
+        ar = drawing.add_arrow([0,0,0], [0,0,3*scale*100],color=[1,0.1,0,1],nodes_per_circle=arrow_nodes_per_circle)
         xyz_arrows.append(ar)
-        ar = drawing.add_arrow([0,0,0], [0,-3,0],color=[0,0.9,0.3,1],nodes_per_circle=arrow_nodes_per_circle)
+        ar = drawing.add_arrow([0,0,0], [0,-3*scale*100,0],color=[0,0.9,0.3,1],nodes_per_circle=arrow_nodes_per_circle)
         xyz_arrows.append(ar)
-        ar = drawing.add_arrow([0,0,0], [3,0,0],color=[0,0.1,1,1],nodes_per_circle=arrow_nodes_per_circle, angle_offset=0)
+        ar = drawing.add_arrow([0,0,0], [3*scale*100,0,0],color=[0,0.1,1,1],nodes_per_circle=arrow_nodes_per_circle, angle_offset=0)
         xyz_arrows.append(ar)
-
-        ar = drawing.add_text([3.2,0,0], 'z')#'[100]')
-        xyz_arrows.append(ar)
-        ar = drawing.add_text([1,-2.8,-1.3], 'y')#'[010]')
-        xyz_arrows.append(ar)
-        ar = drawing.add_text([0,0,2.9], 'x')#'[001]')
-        xyz_arrows.append(ar)
-
-    # add curved arrows
-    if draw_curved_arrows:
-        curved_arrows = []
-        # rocking curve
-        curved_ar_links=21
-        ar = drawing.add_curved_arrow([0,0,0], [5,0,0],[0,0,-1], angular_extent = np.pi/3, links = curved_ar_links,
-                             head_fraction = 0.2, rod_radius = 0.05, hat_radius = 0.1, nodes_per_circle = arrow_nodes_per_circle, color=[1,0,1,1.0])
-        curved_arrows.append(ar)
-        ar = drawing.add_text(np.copy(ar.node_locations[-1]), 'Rocking')
-        curved_arrows.append(ar)
-    #drawing.add_isosurface_mesh(top_stage_mesh) # add top of stage
+        if show_text:
+            ar = drawing.add_text([3.2*scale*100,0,0], 'z')#'[100]')
+            xyz_arrows.append(ar)
+            ar = drawing.add_text([1*scale*100,-2.8*scale*100,-1.3*scale*100], 'y')#'[010]')
+            xyz_arrows.append(ar)
+            ar = drawing.add_text([0,0,2.9*scale*100], 'x')#'[001]')
+            xyz_arrows.append(ar)
 
     if draw_stage:
         stage_dists = 2.2*65*np.array([18,20,20,22,25,28.25,30])-5
         stage_dists *= scale
         stage_color = np.array([1.0,0.95,0.9,1])
         num_along_edge = 20
-        stage_size = 35
+        stage_size = 35*scale*100
         # stage rotator
         # top rotator
         ar = drawing.add_arrow([-stage_dists[0],0,0],
@@ -551,6 +295,7 @@ def make_3d_perspective(ex,
                                [-0.5*(stage_dists[0]+stage_dists[1]),0.4*stage_size,0],
                                head_fraction = 0, rod_radius = 17*0.3*(stage_dists[1]-stage_dists[0])/(0.55*stage_size),
                                hat_radius = 0.0001, nodes_per_circle = num_along_edge, color=stage_color, angle_offset=0)
+
     if not type(tilt_to_vector) == type(None):  # tilt fig rotation
         #drawing.rot_x(-np.arcsin(k0_butt_node[1]/np.sqrt(k0_butt_node[1]**2+k0_butt_node[2]**2)))
         def rot_to_vec(vec0, phi, chi, omega):
@@ -560,7 +305,7 @@ def make_3d_perspective(ex,
             rotate_y(vec,omega)
             return vec
 
-        phi = np.arctan2(ex.k0_vector[1],ex.k0_vector[2])
+        phi = np.arctan2(params['k0_vector'][1],params['k0_vector'][2])
         #print(tilt_to_vector)
         vec = np.copy(tilt_to_vector)
         rotate_x(vec,phi)
@@ -569,16 +314,14 @@ def make_3d_perspective(ex,
         omega = -np.arctan2(vec[2],vec[0])+np.pi
         vec2 = rot_to_vec(tilt_to_vector, phi, chi, omega)
 
-        #print(vec2)
 
-        import scipy.optimize
 
         def rot_to_fit(inp):
             phi = inp[0]
             chi = inp[1]
             omega = inp[2]
             vec = np.copy(tilt_to_vector)
-            vec2 = np.copy(ex.k0_vector)
+            vec2 = np.copy(params['k0_vector'])
             rotate_x(vec,phi)
             rotate_x(vec2,phi)
             #chi = np.arctan2(vec[1],np.sqrt(vec[0]**2+vec[2]**2))
@@ -591,7 +334,7 @@ def make_3d_perspective(ex,
             vec2 = vec2/np.sqrt(np.sum(vec2**2))
             #print(vec, vec2)
             #print( np.abs(vec[0]-1)*1000+np.abs(vec[2])+np.abs(vec[1])+np.abs(vec2[0])+np.abs(vec2[1]))
-            return np.abs(vec[0]-1)+np.abs(vec2[2]-1)+np.abs(vec[2])+np.abs(vec[1])+np.abs(vec2[0])+np.abs(vec2[1])# + np.abs(ex.k0_vector[0]) + np.abs(ex.k0_vector[1])
+            return np.abs(vec[0]-1)+np.abs(vec2[2]-1)+np.abs(vec[2])+np.abs(vec[1])+np.abs(vec2[0])+np.abs(vec2[1])# + np.abs(params['k0_vector'][0]) + np.abs(params['k0_vector'][1])
 
         out= scipy.optimize.minimize(rot_to_fit,np.array([phi,chi,omega]), tol=10**-10)
         #print(out)
@@ -601,6 +344,7 @@ def make_3d_perspective(ex,
         vec2 = rot_to_vec(tilt_to_vector, phi, chi, omega)
         #print(vec2)
         drawing.rot_x(phi)
+
     if draw_stage:
         # bottom rotator
         stage_color= np.copy(stage_color)
@@ -622,7 +366,8 @@ def make_3d_perspective(ex,
         phi_ang = -phi*180/np.pi %360
         if phi_ang>180:
             phi_ang-=360
-        ar = drawing.add_text(np.copy(ar.node_locations[-1])+np.array([3,3,0]), f'𝜑 = {phi_ang:.2f}°')
+        if show_text:
+            ar = drawing.add_text(np.copy(ar.node_locations[-1])+np.array([3,3,0]), f'𝜑 = {phi_ang:.2f}°')
         outstr.append(f'phi = {phi_ang:.2f} degrees')
     if not type(tilt_to_vector) == type(None): # tilt fig azimuthal
         drawing.rot_z(chi)
@@ -638,14 +383,13 @@ def make_3d_perspective(ex,
         chi_ang = -chi*180/np.pi %360
         if chi_ang>180:
             chi_ang-=360
-        ar = drawing.add_text(np.array([-stage_dists[4],0,-stage_size*0.5]), f'𝜒 = {-chi_ang:.2f}°')
+        if show_text:
+            ar = drawing.add_text(np.array([-stage_dists[4],0,-stage_size*0.5]), f'𝜒 = {-chi_ang:.2f}°')
         outstr.append(f'chi = {-chi_ang:.2f} degrees')
 
 
     if not type(tilt_to_vector) == type(None): # tilt fig rocking
         drawing.rot_y(omega)
-    # table
-    #table_nodes, _, __ = drawing.add_box([0,stage_size*10,stage_size*10], [-stage_dists[7],0,0], angle_vector=np.array([0,0,0]),
 
     # top part of stage
     if draw_stage:
@@ -657,179 +401,64 @@ def make_3d_perspective(ex,
         omega_ang = -omega*180/np.pi %360
         if omega_ang>180:
             omega_ang-=360
-        ar = drawing.add_text(np.array([-stage_dists[5],stage_size*0.5,0]), f'𝜔 = {-omega_ang:.2f}°')
+        if show_text:
+            ar = drawing.add_text(np.array([-stage_dists[5],stage_size*0.5,0]), f'𝜔 = {-omega_ang:.2f}°')
         outstr.append(f'omega = {-omega_ang:.2f} degrees')
 
-
-    # azimuthal curve
-    #drawing.add_isosurface_mesh(mid_stage_mesh) # add middle part of stage
-    if draw_curved_arrows:
-        ar = drawing.add_curved_arrow([0,0,0],[6,0,0],[0,1,0], angular_extent = np.pi/3, links = curved_ar_links,
-                             head_fraction = 0.2, rod_radius = 0.05, hat_radius = 0.1, nodes_per_circle = arrow_nodes_per_circle, color=[0.7,0.7,0,1.0])
-        curved_arrows.append(ar)
-        ar = drawing.add_text(np.copy(ar.node_locations[-1]), 'Azimuthal')
-        curved_arrows.append(ar)
-
-    if draw_curved_arrows:
-        f=1.5/4
-        ar = drawing.add_curved_arrow([-1,0,0],[-1,6/np.sqrt(2)/1.5,-6/np.sqrt(2)/1.5],[0,0,1], angular_extent = 4*np.pi/3, links = curved_ar_links*3,
-                             head_fraction = 0.1, rod_radius = 0.05*f, hat_radius = 0.1*f, nodes_per_circle = arrow_nodes_per_circle, color=[0,0.7,0.7,1.0], angle_offset=np.pi)
-        curved_arrows.append(ar)
-        ar = drawing.add_text([-1,1,4], 'Rotation')
-        curved_arrows.append(ar)
-
-    # add id06 axes
-    if 0:
-        xyz_arrows = []
-        print_time('# add arrows')
-        ar = drawing.add_arrow([0,0,0], [0,0,3],color=[1,0.1,0,1],nodes_per_circle=arrow_nodes_per_circle)
-        xyz_arrows.append(ar)
-        ar = drawing.add_arrow([0,0,0], [0,-3,0],color=[0,0.9,0.3,1],nodes_per_circle=arrow_nodes_per_circle)
-        xyz_arrows.append(ar)
-        ar = drawing.add_arrow([0,0,0], [3,0,0],color=[0,0.1,1,1],nodes_per_circle=arrow_nodes_per_circle, angle_offset=0)
-        xyz_arrows.append(ar)
-
-        ar = drawing.add_text([3.2,0,0], 'z')#'[100]')
-        xyz_arrows.append(ar)
-        ar = drawing.add_text([1,-2.8,-1.3], 'y')#'[010]')
-        xyz_arrows.append(ar)
-        ar = drawing.add_text([0,0,2.9], 'x')#'[001]')
-        xyz_arrows.append(ar)
     # rotate perspective nicely
-    print_time('# rotate perspective nicely')
     drawing.rot_y(-90*np.pi/180)
-    drawing.rot_x(100*np.pi/180) # 95
-    drawing.rot_y(-20*np.pi/180)
+    drawing.rot_x(90*np.pi/180) # 95
+    #drawing.rot_y(-20*np.pi/180)
     # translate arrows
     if draw_scattering_arrows:
         for ar in Q_arrows:
             ar*=30/8
-            ar += np.array([15,-10,10])*30/8
+            ar += np.array([15,-10,10])*30/8*scale*100
+
     if draw_axes:
         for ar in xyz_arrows:
             ar*=30/8
-            ar += np.array([-10,-10,-10])*30/8
-    if draw_curved_arrows:
-        for ar in curved_arrows:
-            ar*=30/8
-            ar += np.array([15,-10,10])*30/8
+            ar += np.array([-10,-10,-10])*30/8*scale*100
+
     # move crystal_structure
     if not type(atom_list) == type(None):
         for atom in crystal_structure:
             atom += crysta_structure_position
-    # final rotation
-    if not type(final_rotation_function) == type(None):
-        final_rotation_function(drawing)
-
-
     # draw
-    print_time('# draw')
-    drawing.draw_structure(fig, ax, factor = factor, view_angle=view_angle, axis_off=True)
-    print_time('#  rendered')
+    drawing.draw_structure(ax)
     # enable render
-    if object_classes.backend == 'mayavi':
-        fig.scene.disable_render = False
-    if object_classes.backend == 'plotly':
-        import plotly.graph_objects
-        fig = plotly.graph_objects.Figure(data=ax['data'])
+    import plotly.graph_objects
 
-        camera = dict(
-            up=dict(x=0, y=1, z=0),
-            center=dict(x=0, y=0, z=0),
-            eye=dict(x=0, y=0, z=2),
-            projection = dict(
-            type="orthographic",
-            ),
+    fig = plotly.graph_objects.Figure(data=ax['data'])
+    camera = dict(
+        up=dict(x=0, y=1, z=0),
+        center=dict(x=0, y=0, z=0),
+        eye=dict(x=-0.2, y=0.4, z=2),
+        projection = dict(
+        type="orthographic",
+        ),
+    )
+    scene = dict(
+            xaxis = dict(visible=False, range=[-50000,50000]),
+            yaxis = dict(visible=False, range=[-50000,50000]),
+            zaxis = dict(visible=False, range=[-50000,50000]),
+            #aspectmode='data',
+            aspectratio = dict(x=8, y=8, z=8),
+            annotations = ax['annotations'],
+
         )
-
-        scene = dict(
-                xaxis = dict(visible=False),
-                yaxis = dict(visible=False),
-                zaxis = dict(visible=False),
-                annotations = ax['annotations'],
+    fig.update_layout( scene_camera = camera, scene = scene,
+            margin=dict(t=0, r=0, l=0, b=0),
+            height=800,
+            width = 1100,
             )
-        fig.update_layout( scene_camera = camera, scene = scene,
-                margin=dict(t=0, r=0, l=0, b=0),
-                height=800,
-                width = 1100,
-                )
+    #for d in ax['data'][1:]:
+    #    fig.add_trace(d)
+
     if not type(export_blender_filepath) == type(None):
         drawing.export_blender(export_blender_filepath)
 
     return drawing, fig, ax, outstr
-
-
-def isosurface_mesh_from_matrix(threeD_matrix, level = 0, step_size = 10, del_x = np.array([1,1,1]), meshcolor=[0,0,0,0], facecolor=[1,0.6,0,0.7], abscolor=True):
-    '''
-    Makes an isosurface from threeD_matrix using skimage.measure.marching_cubes and generates a mesh centered on zero
-    input:
-        threeD_matrix: 3d numpy array of intensity
-        level: level for the isosurface
-        step_size: step size for the triangle mesh, see skimage.measure.marching_cubes
-        del_x: numpy array of shape (3), step size in threeD_matrix
-        meshcolor: numpy array of shape (4), color of the mesh lines
-        facecolor: numpy array of shape (4), color of the mesh faces
-        abscolor: bool, default True. If True, all facets are given same color, if False, coror is dependent angle of facet
-    returns
-        mesh: a object_classes.Mesh object
-    '''
-    # generate isosrface
-    import skimage.measure
-    verts, faces, normals, values = skimage.measure.marching_cubes(threeD_matrix, level, step_size=step_size)
-    # shape to real shape
-    verts *= del_x*(np.array(threeD_matrix.shape)/(np.array(threeD_matrix.shape)-1))
-    verts -= 0.5*(threeD_matrix.shape*del_x)
-    # generate mesh
-    mesh = object_classes.Mesh(verts, faces, meshcolor=meshcolor, facecolor=facecolor, abscolor = abscolor)
-    return mesh
-
-def split_mesh_in_bodies(verts, faces):
-    '''
-    Splits meshes into independent bodies. This helps the projection for matplotlib.
-    input:
-        verts, numpy array of floats with shape (N,3) # locations in space
-        faces, numpy array of ints with shape (M,3) # faces connecting three nodes
-    returns:
-        vetices_list
-        faces_list
-    '''
-    # find independent bodies and label the vertices into bodies
-    vert_groupings = np.arange(len(verts))
-    changed = True
-    while changed:
-        changed = False
-        for i, face in enumerate(faces):
-            m = np.min([vert_groupings[face[0]],vert_groupings[face[1]],vert_groupings[face[2]]])
-            if not all(vert_groupings[face]==m):
-                vert_groupings[face]=m
-                changed=True
-    groups = list(set(vert_groupings))
-
-    # make lists of faces by finding what group each face is in
-    faces_list = []
-    for i, group in enumerate(groups):
-        faces_list.append([])
-        for face in faces:
-            if vert_groupings[face[0]]==group:
-                faces_list[-1].append(face)
-
-    # make lists of vertices and adjust the integers in faces_list to correspond to new numbers
-    vetices_list = []
-    for j, faces in enumerate(faces_list):
-        faces_list[j] = np.array(faces)
-        faces = faces_list[j]
-        vertices_in_set = list(set(faces.ravel()))
-        current_vertices = np.array(verts[vertices_in_set])
-        vetices_list.append(current_vertices)
-        tempmap = {}
-        for i, vertice in enumerate(vertices_in_set):
-            tempmap[vertice] = i
-        for face in faces:
-            face[0] = tempmap[face[0]]
-            face[1] = tempmap[face[1]]
-            face[2] = tempmap[face[2]]
-
-    return vetices_list, faces_list
 
 
 
@@ -856,17 +485,6 @@ class Drawing:
         self.objects.append(text)
         return text
 
-    def add_isosurface_mesh(self, mesh):
-        '''
-        adds a ready formed object_classes.Mesh
-        input:
-            mesh: object_classes.Mesh object
-        returns:
-            mesh: object_classes.Mesh object
-        '''
-        self.nodes.append(mesh)
-        self.objects.append(mesh)
-        return mesh
 
     def add_mesh(self,node_locations, faces, meshcolor=[0,0,0,0], facecolor=[0,0.3,0.7,0.5], abscolor=False):
         '''
@@ -925,21 +543,6 @@ class Drawing:
                 self.objects.append(object_classes.BoxLine(box_node_collection, seg, meshcolor = meshcolor, linewidth = linewidth))
         return box_node_collection, self.objects[-(6+8):-8], self.objects[-8:]
 
-    def add_pcolormesh(self, node_locations,  intensity_imaging_system):
-        '''
-        adds a pcolormesh spanning node locations forming a quadrilateral
-        input:
-            node_locations: list of four node locations (np.array with shape (4,3))
-            intensity_imaging_system: intensity to display on the pcolormesh
-        returns:
-            object_classes.NodeCollection object
-            object_classes.QuadrilateralColormesh object
-        '''
-        node_collection = object_classes.NodeCollection(node_locations)
-        self.nodes.append(box_node_collection)
-        pcolormesh = object_classes.QuadrilateralColormesh(node_collection, [0,1,2,3], intensity_imaging_system)
-        self.objects.append(pcolormes)
-        return node_collection, pcolormesh
 
     def add_atom_list(self, atom_list):
         '''
@@ -962,53 +565,17 @@ class Drawing:
         return node_list
 
 
-    def draw_structure(self, fig, ax, axis_off = True, xlim = None, ylim = None, factor = 1000, view_angle=8):
+    def draw_structure(self, ax):
         '''
         Renders the scene
         input:
-            fig: matplotlib figure
-            ax: matplotlib axes
-            xlim: optional default = None, the xlimits in the axis [xmin, xmax]
-            ylim: optional default = None, the ylimits in the axis [ymin, ymax]
-            axis_off: optional default = True, if True disables the axis fromain gthe scene
-            axis_off: optional default = True, if True disables the axis fromain gthe scene
-            axis_off: optional default = True, if True disables the axis fromain gthe scene
-            factor: optional default = 1000, distance from object to camera
-            view_angle: mayavi view angle, optional
+            ax: plotly axes
         '''
-        self.fig = fig
         self.ax = ax
-        if object_classes.backend == 'matplotlib':
-            # transform objects from 3d to 2d plane
-            for object in self.objects:
-                object.transform(factor=factor)
-                if not hasattr(object,'layer'):
-                    object.layer=0
-            # sort objects based distance from center of object to camera
-            self.objects=sorted(self.objects, key=lambda x: (x.loc[0]**2+x.loc[1]**2+(x.loc[2]-factor)**2), reverse=True)
-            # sort objects based manually set labels, if any
-            self.objects=sorted(self.objects, key=lambda x: x.layer, reverse=False)
-            # add order as a parameter to the objects
-            for i, object in enumerate(self.objects):
-                object.z_order = i
         # draw objects
         for obj in self.objects:
             obj.draw(self.ax)
-            print_time_render('# rendered '+str(obj))
-        if object_classes.backend == 'matplotlib':
-            # misc figure stuff
-            if axis_off==True:
-                self.ax.axis('off')
-            self.ax.set_aspect('equal')
-            if not type(xlim)==type(None):
-                self.structure.ax.set_xlim(xlim)
-            if not type(ylim)==type(None):
-                self.structure.ax.set_xlim(ylim)
-        elif object_classes.backend == 'mayavi':
-            import mayavi.mlab
-            mayavi.mlab.view(azimuth=0, elevation=0, distance=factor, focalpoint=[0,0,0], figure=fig)
-            camera = fig.scene.camera
-            camera.view_angle = view_angle
+
 
 
     def rot_x(self,phi):
@@ -1204,39 +771,18 @@ class Drawing:
                 sqare_lim = radius/np.sqrt(2)
                 for node in lis:
                     nodes2.append(node[0:3])
-                    if 0: #circular
-                        dist = i*branch_length
-                        nodes2[-1] *= dist/np.sqrt(np.sum(node[0:3]**2))
-                    elif 0: #square by cut
-                        dist = i*branch_length
-                        nodes2[-1] *= dist/np.sqrt(np.sum(node[0:3]**2))
-                        if nodes2[-1][0] > sqare_lim: nodes2[-1][0]=sqare_lim
-                        if nodes2[-1][0] < -sqare_lim: nodes2[-1][0]=-sqare_lim
-                        if nodes2[-1][1] > sqare_lim: nodes2[-1][1]=sqare_lim
-                        if nodes2[-1][1] < -sqare_lim: nodes2[-1][1]=-sqare_lim
-                    else: #square move
-                        dist = num_links*branch_length
-                        nodes2[-1] *= dist/np.sqrt(np.sum(node[0:3]**2))
-                        if nodes2[-1][0] > sqare_lim: nodes2[-1][0]=sqare_lim
-                        if nodes2[-1][0] < -sqare_lim: nodes2[-1][0]=-sqare_lim
-                        if nodes2[-1][1] > sqare_lim: nodes2[-1][1]=sqare_lim
-                        if nodes2[-1][1] < -sqare_lim: nodes2[-1][1]=-sqare_lim
-                        nodes2[-1] *=i/num_links
+                    dist = num_links*branch_length
+                    nodes2[-1] *= dist/np.sqrt(np.sum(node[0:3]**2))
+                    if nodes2[-1][0] > sqare_lim: nodes2[-1][0]=sqare_lim
+                    if nodes2[-1][0] < -sqare_lim: nodes2[-1][0]=-sqare_lim
+                    if nodes2[-1][1] > sqare_lim: nodes2[-1][1]=sqare_lim
+                    if nodes2[-1][1] < -sqare_lim: nodes2[-1][1]=-sqare_lim
+                    nodes2[-1] *=i/num_links
                     nodes2[-1][2] = r_curvature-np.sqrt(r_curvature**2-np.sum(nodes2[-1][0:2]**2))
             outer_nodes = np.arange(outer_nodes_start,len(nodes2))
             nodes = np.array(nodes2)
             if invert:
                 nodes[:,2]*=-1
-            if 0:
-                # if we convert it to a square by cut, we have to remove vertices that no longer fit
-                for i in np.arange(len(facets))[::-1]:
-                    facet = facets[i]
-                    p0 = nodes[int(facet[0])]
-                    p1 = nodes[int(facet[1])]
-                    p2 = nodes[int(facet[2])]
-                    normals = np.cross(p0 - p1, p2 - p1)
-                    if sum(normals**2) < 10**-20:
-                        facets.pop(i)
             facets = np.array(facets, dtype = int)
             # rotate from facing a to facing b
             facing /= np.sqrt(np.sum(facing**2))
@@ -1271,6 +817,7 @@ class Drawing:
 
 def normalize(vec):
     return vec/np.sqrt(np.sum(vec**2))
+
 def rotation_matrix(axis, theta):
     """
     Return the rotation matrix associated with counterclockwise rotation about
@@ -1436,64 +983,6 @@ def make_arrow_mesh(start, end, head_fraction = 0.45, rod_radius = 0.1, hat_radi
 
     return object_classes.Mesh(nodes, facets, meshcolor=[0,0,0,0], facecolor=color, abscolor=False)
 
-
-def make_meshes_from_domains(domains, del_x, levels = None, colors = None, mod=1, step_size = 10, edge_zero = True):
-    '''
-    function that generates a list of dfxrm.three_d_draw_object_classes.Mesh objects from the domains object
-    input:
-        domains: 3d numpy array with a areas of constant vlaue signifying domains
-        del_x: numpy array of set sizes for the domain array, i.e. ex.del_ex
-        levels: optional default None. levels in domains to make meshes for. If None, a list is made by np.unique(domains)
-        colors: optional, list of color [r,g,b,a] for different domanis. By default a list with 9 elements is used
-        mod: optional float, default 1. Modulus to use for the domains array when assigning colors.
-        step_size: int default 10, step size for the triangular mesh generation (skimage.measure.marching_cubes)
-        edge_zero: bool default True. If true, will created mesh at edges in all cases
-    '''
-    def get_domains(domains, level, edge_zero):
-        '''
-        returns a 'boolean' copy of domains where everywhere (domains==level) will be set to 1, and all others are zero
-        '''
-        domains_to_show=np.copy(domains)
-        domains_to_show[domains_to_show==level]=-1
-        domains_to_show[domains_to_show!=-1]=0
-        if edge_zero == True:
-            # make outer edges zero:
-            domains_to_show[0,:,:]=0
-            domains_to_show[:,0,:]=0
-            domains_to_show[:,:,0]=0
-            # make sure a zero is within the step size at end
-            domains_to_show[:,-step_size:,:]=0
-            domains_to_show[-step_size:,:,:]=0
-            domains_to_show[:,:,-step_size:]=0
-        return -domains_to_show
-    meshes=[]
-    if type(colors)==type(None):
-        colors = np.array([[1,0,0,0.95],
-                           [0,1,0.3,0.95],
-                           [0,0,1,0.95],
-                           [0,1,1,0.95],
-                           [1,0,1,0.95],
-                           [1,1,0,0.95],
-                           [0.25,0.25,0.25,0.95],
-                           [0.5,0.5,.5,0.95],
-                           [1,1,1,0.95],
-                          ])
-    if type(levels) == type(None):
-        levels =  np.unique(domains)
-    i = 0
-    for dom_type in levels:
-        try:
-            if dom_type % mod == 0:
-                i=0
-            else:
-                i+=1
-            meshes.append(isosurface_mesh_from_matrix(get_domains(domains, dom_type, edge_zero), level = 0.9,
-                                            step_size = step_size, del_x = del_x, meshcolor=[0,0,0,0],
-                                            facecolor=colors[i%len(colors)], abscolor=False))
-        except ValueError:
-            print(f"ValueError in make_internals():get_domains()!  perhaps {dom_type} not in domains with step_size {step_size}.",
-                  "You can safely ignore this message if it looks correct")
-    return meshes
 
 def vector_to_hkl(vector):
         '''
