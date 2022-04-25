@@ -96,7 +96,7 @@ def make_3d_perspective(params, export_blender_filepath=None,
         mid_point = [mid_point[0] * params['shape'][0], mid_point[1] * params['shape'][1]]
 
         thickness_offset = normalize(np.cross(np.array([-np.sin(surface_angle),np.cos(surface_angle),0]), params['k0_vector']))
-        thickness_offset *= params['beam_thickness']
+        thickness_offset *= params['beam_thickness']*scale
         #thickness_offset *= 0.2/np.sqrt(np.sum(thickness_offset**2))
         # front intesection of beam
         beam_with_dir = np.cross(params['Q_vector'],params['k0_vector'])
@@ -171,6 +171,10 @@ def make_3d_perspective(params, export_blender_filepath=None,
         # extend back end of box to the detector
         node_locs[4:,:] += extend_imaging_system[1]*params['kh_vector'][np.newaxis,:]/params['kh_vector'][2]
         node_locs[:,:] += -0.5*box_shape[2]*np.array([0,0,1])
+        #
+        node_locs[[0,1,4,5],:] += 0.5*thickness_offset
+        node_locs[[2,3,6,7],:] -= 0.5*thickness_offset
+
         '''
         if lens_scale > 0
             explode_0 = 10*lens_scale*normalize(np.cross(params['Q_vector'],params['kh_vector']))
@@ -239,51 +243,53 @@ def make_3d_perspective(params, export_blender_filepath=None,
             drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,0.2], abscolor=False))
 
     if draw_scattering_arrows:
+        q_arrows_scale = 1.0
         Q_arrows = []
         Q_norm = params['Q_vector']/(np.sqrt(np.sum(params['k0_vector']**2))+np.sqrt(np.sum(params['kh_vector']**2)))
-        ar = drawing.add_arrow([0,0,0], Q_norm*9*scale*100,color=[0,0,0,1],nodes_per_circle=arrow_nodes_per_circle,head_fraction = 0.45/1, rod_radius = 0.1, hat_radius = 0.25)
+        ar = drawing.add_arrow([0,0,0], Q_norm*9*q_arrows_scale*100,color=[0,0,0,1],nodes_per_circle=arrow_nodes_per_circle,head_fraction = 0.45/1, rod_radius = 0.1, hat_radius = 0.25)
         Q_arrows.append(ar)
         if show_text:
-            ar = drawing.add_text(Q_norm*9*scale*100, 'Q')
+            ar = drawing.add_text(Q_norm*9*q_arrows_scale*100, 'Q')
             Q_arrows.append(ar)
         k0_norm = params['k0_vector']/np.sqrt(np.sum(params['k0_vector']**2))
-        ar = drawing.add_arrow(-k0_norm*4.5*scale*100, [0,0,0],color=[0.5,0,0,1],nodes_per_circle=arrow_nodes_per_circle,head_fraction = 0.45/3, rod_radius = 0.1/3, hat_radius = 0.25/3)
+        ar = drawing.add_arrow(-k0_norm*4.5*q_arrows_scale*100, [0,0,0],color=[0.5,0,0,1],nodes_per_circle=arrow_nodes_per_circle,head_fraction = 0.45/3, rod_radius = 0.1/3, hat_radius = 0.25/3)
         k0_butt_node = ar.node_locations[0] # use this to rotate stage
         Q_arrows.append(ar)
         if show_text:
-            ar = drawing.add_text((-k0_norm*4.5+np.array([1,0,0]))*scale*100, 'k0')
+            ar = drawing.add_text((-k0_norm*4.5+np.array([1,0,0]))*q_arrows_scale*100, 'k0')
             Q_arrows.append(ar)
         kh_norm = params['kh_vector']/np.sqrt(np.sum(params['kh_vector']**2))
-        ar = drawing.add_arrow([0,0,0], kh_norm*4.5*scale*100,color=[0.5,0,0,1],nodes_per_circle=arrow_nodes_per_circle,head_fraction = 0.45/3, rod_radius = 0.1/3, hat_radius = 0.25/3)
+        ar = drawing.add_arrow([0,0,0], kh_norm*4.5*q_arrows_scale*100,color=[0.5,0,0,1],nodes_per_circle=arrow_nodes_per_circle,head_fraction = 0.45/3, rod_radius = 0.1/3, hat_radius = 0.25/3)
         Q_arrows.append(ar)
         if show_text:
-            ar = drawing.add_text(kh_norm*4.5*scale*100, 'kh')
+            ar = drawing.add_text(kh_norm*4.5*q_arrows_scale*100, 'kh')
             Q_arrows.append(ar)
 
 
     # add id06 axes
     if draw_axes:
+        xyz_arrows_scale = 1.0
         xyz_arrows = []
-        ar = drawing.add_arrow([0,0,0], [0,0,3*scale*100],color=[1,0.1,0,1],nodes_per_circle=arrow_nodes_per_circle)
+        ar = drawing.add_arrow([0,0,0], [0,0,3*xyz_arrows_scale*100],color=[1,0.1,0,1],nodes_per_circle=arrow_nodes_per_circle)
         xyz_arrows.append(ar)
-        ar = drawing.add_arrow([0,0,0], [0,-3*scale*100,0],color=[0,0.9,0.3,1],nodes_per_circle=arrow_nodes_per_circle)
+        ar = drawing.add_arrow([0,0,0], [0,-3*xyz_arrows_scale*100,0],color=[0,0.9,0.3,1],nodes_per_circle=arrow_nodes_per_circle)
         xyz_arrows.append(ar)
-        ar = drawing.add_arrow([0,0,0], [3*scale*100,0,0],color=[0,0.1,1,1],nodes_per_circle=arrow_nodes_per_circle, angle_offset=0)
+        ar = drawing.add_arrow([0,0,0], [3*xyz_arrows_scale*100,0,0],color=[0,0.1,1,1],nodes_per_circle=arrow_nodes_per_circle, angle_offset=0)
         xyz_arrows.append(ar)
         if show_text:
-            ar = drawing.add_text([3.2*scale*100,0,0], 'z')#'[100]')
+            ar = drawing.add_text([3.2*xyz_arrows_scale*100,0,0], 'z')#'[100]')
             xyz_arrows.append(ar)
-            ar = drawing.add_text([1*scale*100,-2.8*scale*100,-1.3*scale*100], 'y')#'[010]')
+            ar = drawing.add_text([1*xyz_arrows_scale*100,-2.8*xyz_arrows_scale*100,-1.3*xyz_arrows_scale*100], 'y')#'[010]')
             xyz_arrows.append(ar)
-            ar = drawing.add_text([0,0,2.9*scale*100], 'x')#'[001]')
+            ar = drawing.add_text([0,0,2.9*xyz_arrows_scale*100], 'x')#'[001]')
             xyz_arrows.append(ar)
 
     if draw_stage:
         stage_dists = 2.2*65*np.array([18,20,20,22,25,28.25,30])-5
-        stage_dists *= scale
+        stage_dists #*= scale
         stage_color = np.array([1.0,0.95,0.9,1])
         num_along_edge = 20
-        stage_size = 35*scale*100
+        stage_size = 35*100#*scale
         # stage rotator
         # top rotator
         ar = drawing.add_arrow([-stage_dists[0],0,0],
@@ -413,12 +419,12 @@ def make_3d_perspective(params, export_blender_filepath=None,
     if draw_scattering_arrows:
         for ar in Q_arrows:
             ar*=30/8
-            ar += np.array([15,-10,10])*30/8*scale*100
+            ar += np.array([15,-10,10])*30/8*q_arrows_scale*100
 
     if draw_axes:
         for ar in xyz_arrows:
             ar*=30/8
-            ar += np.array([-10,-10,-10])*30/8*scale*100
+            ar += np.array([-10,-10,-10])*30/8*xyz_arrows_scale*100
 
     # move crystal_structure
     if not type(atom_list) == type(None):
@@ -439,11 +445,11 @@ def make_3d_perspective(params, export_blender_filepath=None,
         ),
     )
     scene = dict(
-            xaxis = dict(visible=False, range=[-50000,50000]),
-            yaxis = dict(visible=False, range=[-50000,50000]),
-            zaxis = dict(visible=False, range=[-50000,50000]),
+            xaxis = dict(visible=False, range=[-500000,500000]),
+            yaxis = dict(visible=False, range=[-500000,500000]),
+            zaxis = dict(visible=False, range=[-500000,500000]),
             #aspectmode='data',
-            aspectratio = dict(x=8, y=8, z=8),
+            aspectratio = dict(x=80, y=80, z=80),
             annotations = ax['annotations'],
 
         )

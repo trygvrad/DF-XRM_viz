@@ -57,9 +57,10 @@ energy_kev = st.sidebar.number_input('Energy [keV]',0.0,1000000.0,17.0, key = 'e
 lmbd_AA = st.sidebar.number_input('Wavelength [Å]',0.0,1000000.0,4.135667696*10**-15 *299792458 / energy_kev /1000*10**10, key = 'lmbd_AA', on_change = update_kev, format="%.4f")
 
 st.sidebar.markdown('Geometry')
+sample_thickness = st.sidebar.number_input('Sample thickness [µm]',0.0,1000000.0,150.0) #min, max, default
+
 sample_height = st.sidebar.number_input('Sample height [µm]',0.001,1000000.0,5000.0) #min, max, default
 sample_width = st.sidebar.number_input('Sample width [µm]',0.001,1000000.0,5000.0) #min, max, default
-sample_thickness = st.sidebar.number_input('Sample thickness [µm]',0.0,1000000.0,150.0) #min, max, default
 
 
 #######################################################################
@@ -336,23 +337,23 @@ if uploaded_file is not None or crystal != 'Upload':
     if vo:
         def parse_vec(description, default_string):
             s = st.sidebar.text_input(description, default_string)
-            return [float(v) for v in s.split(',')]
-        scale = st.sidebar.number_input('sample render scale',0.00001,1000000.0,scale) #min, max, default
-        extend_beam = parse_vec('Extend beam front/back µm', str(extend_beam).strip('[]'))
-        extend_imaging_system = (5000,st.sidebar.number_input('sample-lens distance',0.00001,1000000.0,extend_imaging_system[1]))
+            return np.array([float(v) for v in s.split(',')])
+        scale = st.sidebar.number_input('Sample scale',0.00001,1000000.0,scale) #min, max, default
+        extend_beam = parse_vec('Extend beam front/back µm', str(extend_beam).strip('[]'))*scale
+        extend_imaging_system = np.array([5000,st.sidebar.number_input('sample-lens distance µm',0.00001,1000000.0,extend_imaging_system[1])])*scale
         lens_scale = st.sidebar.number_input('lens scale (scaled to sample)',0.00001,1000000.0,lens_scale) #min, max, default
 
-        params['transverse_width'] = st.sidebar.number_input('beam width (scaled to sample)',0.00001,1000000.0,params['transverse_width']) #min, max, default
-        params['beam_thickness'] = st.sidebar.number_input('beam thickness (scaled to sample)',0.00001,1000000.0,params['beam_thickness']) #min, max, default
-        crystal_scale = st.sidebar.number_input('crystal scale',0.00001,1000000.0,crystal_scale)
-        crysta_structure_position = parse_vec('crystal position', str(crysta_structure_position).strip('[]'))
+        params['transverse_width'] = st.sidebar.number_input('beam width, µm',0.00001,1000000.0,params['transverse_width']) #min, max, default
+        params['beam_thickness'] = st.sidebar.number_input('beam thickness, µm',0.00001,1000000.0,params['beam_thickness']) #min, max, default
+        crystal_scale = st.sidebar.number_input('crystal structure scale',0.00001,1000000.0,crystal_scale)
+        crysta_structure_position = parse_vec('crystal structure position', str(crysta_structure_position).strip('[]'))
         legend_pos_shift = parse_vec('crystal legend position', str(legend_pos_shift).strip('[]'))
         crystal_axes_shift = parse_vec('crystal axes position', str(crystal_axes_shift).strip('[]'))
         cage_list = st.sidebar.text_input('oxygen cages around', ', '.join(cage_list)).split(',')
         oxygen_cage_radius = st.sidebar.number_input('oxygen cage radius',0.00001,1000000.0,oxygen_cage_radius) #min, max, default
         make_bonds = st.sidebar.text_input('make bonds from/to', ', '.join(make_bonds)).split(',')
         make_bonds = [b.strip() for b in make_bonds]
-        bond_length = parse_vec('bond_length', str([min_bond_length, max_bond_length]).strip('[]'))
+        bond_length = parse_vec('bond length', str([min_bond_length, max_bond_length]).strip('[]'))
         min_bond_length = bond_length[0]
         max_bond_length = bond_length[1]
         show_text = st.sidebar.checkbox("show text", show_text)
@@ -482,5 +483,5 @@ if uploaded_file is not None or crystal != 'Upload':
     #if 1:
 
 
-st.write("This toolbox is in beta testing, please independently verify all results, and let me know of any bugs :)")
-st.write("tmara@dtu.dk")
+st.write("This is version 1.0.0. Souce code available at https://github.com/trygvrad/DF-XRM_viz under MIT lisence.")
+st.write("please report bugs to tmara@dtu.dk, or contribute directly at github.")
