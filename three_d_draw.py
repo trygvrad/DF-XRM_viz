@@ -63,6 +63,15 @@ def make_3d_perspective(params, export_blender_filepath=None,
     ax['data'] = []
     ax['annotations'] = []
 
+    if not type(tilt_to_vector) == type(None):  # tilt fig rotation
+        chi, phi, omega, beam_stage_angle = get_phi_chi_omega(params['k0_vector'],tilt_to_vector )
+    else:
+        chi = 0
+        phi = 0
+        omega = 0
+        beam_stage_angle = 0
+    print(params['k0_vector'])
+    print(params['kh_vector'])
     drawing = Drawing()
     # add crystal structure if cif specified
     if not type(atom_list) == type(None):
@@ -175,16 +184,6 @@ def make_3d_perspective(params, export_blender_filepath=None,
         node_locs[[0,1,4,5],:] += 0.5*thickness_offset
         node_locs[[2,3,6,7],:] -= 0.5*thickness_offset
 
-        '''
-        if lens_scale > 0
-            explode_0 = 10*lens_scale*normalize(np.cross(params['Q_vector'],params['kh_vector']))
-            explode_1 = (10*lens_scale+scale*params['transverse_width'])*normalize(np.cross(explode_0, params['kh_vector']))
-            sample_in_lens = np.copy(node_locs[4:])
-            node_locs[4,:] +=  explode_0-explode_1
-            node_locs[5,:] += -explode_0-explode_1
-            node_locs[6,:] += -explode_0+explode_1
-            node_locs[7,:] +=  explode_0+explode_1
-            sample_exploded_in_lens = np.copy(node_locs[4:])'''
         # make object
         box_node_collection = object_classes.NodeCollection(node_locs)
         drawing.nodes.append(box_node_collection)
@@ -194,9 +193,9 @@ def make_3d_perspective(params, export_blender_filepath=None,
                 drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,0.2], abscolor=False))
             sample_in_lens = np.copy(node_locs[4:])
             node_locs[4:,:] = 0.01*node_locs[4:,:] +0.99*np.average(node_locs[4:,:], axis = 0)[np.newaxis, :]
-            sample_compressed_in_lens = np.copy(node_locs[4:])
             box_node_collection = object_classes.NodeCollection(node_locs)
             drawing.nodes.append(box_node_collection)
+            beam_to_lens = box_node_collection.node_locations
             for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
                 drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
         else:
@@ -207,23 +206,20 @@ def make_3d_perspective(params, export_blender_filepath=None,
     #lens
     if lens_scale>0:
         magnification = 3
-        lens_radius = lens_scale*0.5*np.sqrt(2)*scale*np.max([params['shape'][0],params['shape'][1]])
-        lens_pos = [0, 0, (extend_imaging_system[1])]
-        lens_pos[0] +=  (lens_pos[2]-0.5*box_shape[2])*params['kh_vector'][0]/params['kh_vector'][2]
-        lens_pos[1] +=  (lens_pos[2]-0.5*box_shape[2])*params['kh_vector'][1]/params['kh_vector'][2]
+        lens_radius = lens_scale*0.5*np.sqrt(2)*scale*5000#np.max([params['shape'][0],params['shape'][1]])
+        lens_pos = np.average(beam_to_lens[4:,:], axis = 0) # average position of beam in lens
+        ##[0, 0, (extend_imaging_system[1])]
+        #lens_pos[0] +=  (lens_pos[2]-0.5*box_shape[2])*params['kh_vector'][0]/params['kh_vector'][2]
+        #lens_pos[1] +=  (lens_pos[2]-0.5*box_shape[2])*params['kh_vector'][1]/params['kh_vector'][2]
         r_curvature = lens_radius*3
 
         delta_lens = params['kh_vector']/np.sqrt(np.sum(params['kh_vector']**2))
         delta_lens*= 1.1*2*(r_curvature-np.sqrt(r_curvature**2-lens_radius**2))
         num_lenses = 10
-        for i in np.arange(num_lenses):
-            i-= (num_lenses-1)/2-1
-            drawing.add_lens(radius = lens_radius, num_links = 15, r_curvature = r_curvature,
-                    facing = -params['kh_vector'], displacement = lens_pos + delta_lens*i)
 
         # draw scattered from lens center to detector
         node_locs = np.zeros((8,3))
-        node_locs[:4,:] = sample_compressed_in_lens
+        node_locs[:4,:] = beam_to_lens[4:,:]
         node_locs[4:,:] = sample_in_lens
         node_locs[4:,:] += magnification*extend_imaging_system[1]*params['kh_vector'][np.newaxis,:]/params['kh_vector'][2]
         explode_0 = normalize(np.cross(params['Q_vector'],params['kh_vector']))
@@ -302,54 +298,7 @@ def make_3d_perspective(params, export_blender_filepath=None,
                                head_fraction = 0, rod_radius = 17*0.3*(stage_dists[1]-stage_dists[0])/(0.55*stage_size),
                                hat_radius = 0.0001, nodes_per_circle = num_along_edge, color=stage_color, angle_offset=0)
 
-    if not type(tilt_to_vector) == type(None):  # tilt fig rotation
-        #drawing.rot_x(-np.arcsin(k0_butt_node[1]/np.sqrt(k0_butt_node[1]**2+k0_butt_node[2]**2)))
-        def rot_to_vec(vec0, phi, chi, omega):
-            vec = np.copy(vec0)
-            rotate_x(vec,phi)
-            rotate_z(vec,chi)
-            rotate_y(vec,omega)
-            return vec
-
-        phi = np.arctan2(params['k0_vector'][1],params['k0_vector'][2])
-        #print(tilt_to_vector)
-        vec = np.copy(tilt_to_vector)
-        rotate_x(vec,phi)
-        chi = np.arctan2(vec[1],np.sqrt(vec[0]**2+vec[2]**2))
-        rotate_z(vec,chi)
-        omega = -np.arctan2(vec[2],vec[0])+np.pi
-        vec2 = rot_to_vec(tilt_to_vector, phi, chi, omega)
-
-
-
-        def rot_to_fit(inp):
-            phi = inp[0]
-            chi = inp[1]
-            omega = inp[2]
-            vec = np.copy(tilt_to_vector)
-            vec2 = np.copy(params['k0_vector'])
-            rotate_x(vec,phi)
-            rotate_x(vec2,phi)
-            #chi = np.arctan2(vec[1],np.sqrt(vec[0]**2+vec[2]**2))
-            rotate_z(vec,chi)
-            rotate_z(vec2,chi)
-
-            rotate_y(vec,omega)
-            rotate_y(vec2,omega)
-            vec = vec/np.sqrt(np.sum(vec**2))
-            vec2 = vec2/np.sqrt(np.sum(vec2**2))
-            #print(vec, vec2)
-            #print( np.abs(vec[0]-1)*1000+np.abs(vec[2])+np.abs(vec[1])+np.abs(vec2[0])+np.abs(vec2[1]))
-            return np.abs(vec[0]-1)+np.abs(vec2[2]-1)+np.abs(vec[2])+np.abs(vec[1])+np.abs(vec2[0])+np.abs(vec2[1])# + np.abs(params['k0_vector'][0]) + np.abs(params['k0_vector'][1])
-
-        out= scipy.optimize.minimize(rot_to_fit,np.array([phi,chi,omega]), tol=10**-10)
-        #print(out)
-        phi = out['x'][0]
-        chi = out['x'][1]
-        omega = out['x'][2]
-        vec2 = rot_to_vec(tilt_to_vector, phi, chi, omega)
-        #print(vec2)
-        drawing.rot_x(phi)
+    drawing.rot_x(phi)
 
     if draw_stage:
         # bottom rotator
@@ -375,8 +324,7 @@ def make_3d_perspective(params, export_blender_filepath=None,
         if show_text:
             ar = drawing.add_text(np.copy(ar.node_locations[-1])+np.array([3,3,0]), f'𝜑 = {phi_ang:.2f}°')
         outstr.append(f'phi = {phi_ang:.2f} degrees')
-    if not type(tilt_to_vector) == type(None): # tilt fig azimuthal
-        drawing.rot_z(chi)
+    drawing.rot_z(chi)
     # mid part of stage
     if draw_stage:
         stage_color= np.copy(stage_color)
@@ -394,8 +342,7 @@ def make_3d_perspective(params, export_blender_filepath=None,
         outstr.append(f'chi = {-chi_ang:.2f} degrees')
 
 
-    if not type(tilt_to_vector) == type(None): # tilt fig rocking
-        drawing.rot_y(omega)
+    drawing.rot_y(omega)
 
     # top part of stage
     if draw_stage:
@@ -410,6 +357,27 @@ def make_3d_perspective(params, export_blender_filepath=None,
         if show_text:
             ar = drawing.add_text(np.array([-stage_dists[5],stage_size*0.5,0]), f'𝜔 = {-omega_ang:.2f}°')
         outstr.append(f'omega = {-omega_ang:.2f} degrees')
+
+    #lens
+    if lens_scale>0:
+        magnification = 3
+        lens_radius = lens_scale*0.5*np.sqrt(2)*scale*5000#np.max([params['shape'][0],params['shape'][1]])
+        lens_pos = np.average(beam_to_lens[4:,:], axis = 0) # average position of beam in lens
+        ##[0, 0, (extend_imaging_system[1])]
+        #lens_pos[0] +=  (lens_pos[2]-0.5*box_shape[2])*params['kh_vector'][0]/params['kh_vector'][2]
+        #lens_pos[1] +=  (lens_pos[2]-0.5*box_shape[2])*params['kh_vector'][1]/params['kh_vector'][2]
+        r_curvature = lens_radius*3
+        klh = np.copy(params['kh_vector'])
+        rotate_x(klh, phi)
+        rotate_z(klh, chi)
+        rotate_y(klh, omega)
+        delta_lens = klh/np.sqrt(np.sum(klh**2))
+        delta_lens*= 1.1*2*(r_curvature-np.sqrt(r_curvature**2-lens_radius**2))
+        num_lenses = 10
+        for i in np.arange(num_lenses):
+            i-= (num_lenses-1)/2-1
+            mesh = drawing.add_lens(radius = lens_radius, num_links = 15, r_curvature = r_curvature,
+                facing = -klh, displacement = lens_pos + delta_lens*i)
 
     # rotate perspective nicely
     drawing.rot_y(-90*np.pi/180)
@@ -430,6 +398,7 @@ def make_3d_perspective(params, export_blender_filepath=None,
     if not type(atom_list) == type(None):
         for atom in crystal_structure:
             atom += crysta_structure_position
+
     # draw
     drawing.draw_structure(ax)
     # enable render
@@ -795,8 +764,15 @@ class Drawing:
             original_facing = np.array([0, 0, 1.0])
             if not all(facing == original_facing):
                 #https://math.stackexchange.com/questions/180418/calculate-rotation-matrix-to-align-vector-a-to-vector-b-in-3d
-                v = np.cross(original_facing, facing)
-                c = np.dot(original_facing, facing)
+                v = np.cross(original_facing, [1.0,0,0])
+                c = np.dot(original_facing, [1.0,0,0])
+                vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
+                rotation_matix = np.eye(3) + vx + np.dot(vx,vx)/(1+c)
+                nodes = np.matmul(rotation_matix, np.swapaxes(nodes,0,1))
+                nodes = np.swapaxes(nodes,0,1)
+
+                v = np.cross([1.0,0,0], facing)
+                c = np.dot([1.0,0,0], facing)
                 vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
                 rotation_matix = np.eye(3) + vx + np.dot(vx,vx)/(1+c)
                 nodes = np.matmul(rotation_matix, np.swapaxes(nodes,0,1))
@@ -815,11 +791,18 @@ class Drawing:
             facets_2[2*i+1] = np.array([outer_nodes_1[i],outer_nodes_1[(i+1)%l],outer_nodes_0[(i+1)%l]])
         nodes = np.concatenate((nodes_0,nodes_1))
         facets = np.concatenate((facets_0,facets_1,facets_2))
-
+        #for node in nodes:
+            #rotate_x(node, phi)
+            #rotate_z(node, chi)
+            #rotate_y(node, omega)
+            #rotate_y(node, -omega)
+            #rotate_z(node, -chi)
+            #rotate_x(node, -phi)
         nodes += np.array(displacement)
         mesh = object_classes.Mesh(nodes, facets, meshcolor=[0,0,0,0], facecolor=[0.9,0.9,0.9,1], abscolor=False)
         self.nodes.append(mesh)
         self.objects.append(mesh)
+        return mesh
 
 def normalize(vec):
     return vec/np.sqrt(np.sum(vec**2))
@@ -1044,3 +1027,51 @@ def rotate_z(loc,phi):
     x,z=rotate(loc[0],loc[1],phi)
     loc[0] = x
     loc[1] = z
+
+def get_phi_chi_omega(k0,tilt_to_vector ):
+    def rot_to_vec(vec0, phi, chi, omega):
+        vec = np.copy(vec0)
+        rotate_x(vec,phi)
+        rotate_z(vec,chi)
+        rotate_y(vec,omega)
+        return vec
+
+    phi = np.arctan2(k0[1],k0[2])
+    #print(tilt_to_vector)
+    vec = np.copy(tilt_to_vector)
+    rotate_x(vec,phi)
+    chi = np.arctan2(vec[1],np.sqrt(vec[0]**2+vec[2]**2))
+    rotate_z(vec,chi)
+    omega = -np.arctan2(vec[2],vec[0])+np.pi
+    vec2 = rot_to_vec(tilt_to_vector, phi, chi, omega)
+
+
+
+    def rot_to_fit(inp):
+        phi = inp[0]
+        chi = inp[1]
+        omega = inp[2]
+        vec = np.copy(tilt_to_vector)
+        vec2 = np.copy(k0)
+        rotate_x(vec,phi)
+        rotate_x(vec2,phi)
+        #chi = np.arctan2(vec[1],np.sqrt(vec[0]**2+vec[2]**2))
+        rotate_z(vec,chi)
+        rotate_z(vec2,chi)
+
+        rotate_y(vec,omega)
+        rotate_y(vec2,omega)
+        vec = vec/np.sqrt(np.sum(vec**2))
+        vec2 = vec2/np.sqrt(np.sum(vec2**2))
+        #print(vec, vec2)
+        #print( np.abs(vec[0]-1)*1000+np.abs(vec[2])+np.abs(vec[1])+np.abs(vec2[0])+np.abs(vec2[1]))
+        return np.abs(vec[0]-1)+np.abs(vec2[2]-1)+np.abs(vec[2])+np.abs(vec[1])+np.abs(vec2[0])+np.abs(vec2[1])# + np.abs(params['k0_vector'][0]) + np.abs(params['k0_vector'][1])
+
+    out= scipy.optimize.minimize(rot_to_fit,np.array([phi,chi,omega]), tol=10**-10)
+    #print(out)
+    phi = out['x'][0]
+    chi = out['x'][1]
+    omega = out['x'][2]
+    vec2 = rot_to_vec(tilt_to_vector, phi, chi, omega)
+    beam_stage_angle = 10
+    return chi, phi, omega, beam_stage_angle
