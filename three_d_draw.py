@@ -64,179 +64,24 @@ def make_3d_perspective(params, export_blender_filepath=None,
     ax['annotations'] = []
 
     if not type(tilt_to_vector) == type(None):  # tilt fig rotation
-        chi, phi, omega, beam_stage_angle = get_phi_chi_omega(params['k0_vector'],tilt_to_vector )
+        phi, chi, omega, beam_stage_angle = get_phi_chi_omega(params['k0_vector'], params['kh_vector'], tilt_to_vector )
     else:
         chi = 0
         phi = 0
         omega = 0
         beam_stage_angle = 0
-    print(params['k0_vector'])
-    print(params['kh_vector'])
     drawing = Drawing()
     # add crystal structure if cif specified
     if not type(atom_list) == type(None):
         crystal_structure = drawing.add_atom_list(atom_list)
-    # add simulated box
+    # add sample as box
     box_shape = params['shape']*scale
-    box_nodes, _, __ = drawing.add_box(box_shape, [0,0,0], meshcolor=[0,0,0,1], linewidth = 2, facecolor=bounding_box_facecolor, abscolor = False)
+    sample_node_collection, _, __ = drawing.add_box(box_shape, [0,0,0], meshcolor=[0,0,0,1], linewidth = 2, facecolor=bounding_box_facecolor, abscolor = False)
     # text box size
     if show_text:
         drawing.add_text([0,1+0.5*box_shape[1],1+0.5*box_shape[2]], f'{box_shape[0]/scale:.2f} µm')
         drawing.add_text([1+0.5*box_shape[0],0,1+0.5*box_shape[2]], f'{box_shape[1]/scale:.2f} µm')
         drawing.add_text([3+0.5*box_shape[0],-0.5*box_shape[1],-8], f'{box_shape[2]/scale:.2f} µm')
-
-    # add projection of integration
-    #if not type(extend_imaging_system) == type(None):
-    if 1: # always make this, but sometimes it is hidden depending on imaging_system_lw
-        det_projection_nodes, _, __ = drawing.add_box(box_shape*np.array([1,1,0]), [0,0,0],
-                                                        meshcolor=[0,0,0,1], linewidth = imaging_system_lw, facecolor=[0,0,0,0], abscolor = False)
-        node_locs = det_projection_nodes.node_locations
-        kh_norm = params['k0_vector']/np.sqrt(np.sum(params['k0_vector']**2))
-        node_locs[:,:] -= np.sum(node_locs*kh_norm[np.newaxis,:], axis=1)[:,np.newaxis]*kh_norm[np.newaxis,:]
-        node_locs[:4,:] -= (box_shape[2]+extend_imaging_system[0])*kh_norm[np.newaxis,:]/kh_norm[2]
-        node_locs[4:,:] += extend_imaging_system[1]*kh_norm[np.newaxis,:]/kh_norm[2]
-        node_locs[:,2] += 0.5*box_shape[2]
-    # add beam
-    if not type(extend_beam) == type(None):
-        node_locs = np.zeros((8,3))
-
-        surface_angle = -np.arctan2(params['k0_vector'][1], -params['k0_vector'][0])
-        mid_point = params['mid'] # mid in relative units
-        mid_point = [mid_point[0] * params['shape'][0], mid_point[1] * params['shape'][1]]
-
-        thickness_offset = normalize(np.cross(np.array([-np.sin(surface_angle),np.cos(surface_angle),0]), params['k0_vector']))
-        thickness_offset *= params['beam_thickness']*scale
-        #thickness_offset *= 0.2/np.sqrt(np.sum(thickness_offset**2))
-        # front intesection of beam
-        beam_with_dir = np.cross(params['Q_vector'],params['k0_vector'])
-        beam_with_dir /= np.sqrt(np.sum(beam_with_dir**2))
-        beam_loc_0 = beam_with_dir*params['transverse_width']*0.5
-        node_locs[0,0] = np.cos(surface_angle)*(-0.5*params['shape'][0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*params['shape'][1]+mid_point[1])+beam_loc_0[0]
-        node_locs[0,1] = np.cos(surface_angle)*(-0.5*params['shape'][1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*params['shape'][0]+mid_point[0])+beam_loc_0[1]
-        node_locs[0,2] = beam_loc_0[2]
-        node_locs[0,:] *= scale
-        node_locs[1,0] = np.cos(surface_angle)*(-0.5*params['shape'][0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*params['shape'][1]+mid_point[1])-beam_loc_0[0]
-        node_locs[1,1] = np.cos(surface_angle)*(-0.5*params['shape'][1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*params['shape'][0]+mid_point[0])-beam_loc_0[1]
-        node_locs[1,2] = -beam_loc_0[2]
-        node_locs[1,:] *= scale
-
-        node_locs[2,:] = node_locs[1,:]
-        node_locs[3,:] = node_locs[0,:]
-        # back intersection of beam
-        node_locs[4,:] = node_locs[0,:] + box_shape[2]*params['k0_vector']/params['k0_vector'][2]
-        node_locs[5,:] = node_locs[1,:] + box_shape[2]*params['k0_vector']/params['k0_vector'][2]
-        node_locs[6,:] = node_locs[5,:]
-        node_locs[7,:] = node_locs[4,:]
-        # shift
-        node_locs[:4,:] += -extend_beam[0]*params['k0_vector'][np.newaxis,:]/params['k0_vector'][2]
-        node_locs[4:,:] += extend_beam[1]*params['k0_vector'][np.newaxis,:]/params['k0_vector'][2]
-        node_locs[[0,1,4,5],:] += 0.5*thickness_offset
-        node_locs[[2,3,6,7],:] -= 0.5*thickness_offset
-        node_locs[:,:] += -0.5*box_shape[2]*np.array([0,0,1])
-
-        box_node_collection = object_classes.NodeCollection(node_locs)
-        drawing.nodes.append(box_node_collection)
-        if 1:
-            for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
-                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
-
-        #drawing.objects.append(object_classes.BoxFacet(box_node_collection, [0,1,2,3], facecolor = [1,0.6,0,beam_opacity*2], abscolor=False))
-        #drawing.objects.append(object_classes.BoxFacet(box_node_collection, [0,1,2,3], facecolor = [1,0.6,0,beam_opacity*2], abscolor=False))
-
-    if draw_scattered_beam:
-        # add projection from beam intersection
-        node_locs = np.zeros((8,3))
-
-        surface_angle = -np.arctan2(params['k0_vector'][1], -params['k0_vector'][0])
-        mid_point = params['mid'] # mid in relative units
-        mid_point = [mid_point[0] * params['shape'][0], mid_point[1] * params['shape'][1]]
-
-        #xr = np.cos(surface_angle)*(x -mid_point[0]) - np.sin(surface_angle)*(y -mid_point[1])
-        #yr = np.cos(surface_angle)*(y -mid_point[1]) + np.sin(surface_angle)*(x -mid_point[0])
-        #xr = xr / np.cos(incidence_angle)
-        #incidence_angle = np.arccos(params['k0_vector'][2]/np.linalg.norm(params['k0_vector']))
-        # front intesection of beam
-        beam_with_dir = np.cross(params['Q_vector'],params['k0_vector'])
-        beam_with_dir /= np.sqrt(np.sum(beam_with_dir[0:3]**2))
-        incidence_angle = np.arcsin(beam_with_dir[2])
-        beam_loc_0 = beam_with_dir*params['transverse_width']*0.5/np.cos(incidence_angle)**2
-        node_locs[0,0] = np.cos(surface_angle)*(-0.5*params['shape'][0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*params['shape'][1]+mid_point[1])+beam_loc_0[0]
-        node_locs[0,1] = np.cos(surface_angle)*(-0.5*params['shape'][1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*params['shape'][0]+mid_point[0])+beam_loc_0[1]
-        node_locs[0,:] *= scale
-        node_locs[1,0] = np.cos(surface_angle)*(-0.5*params['shape'][0]+mid_point[0]) - np.sin(surface_angle)*(-0.5*params['shape'][1]+mid_point[1])-beam_loc_0[0]
-        node_locs[1,1] = np.cos(surface_angle)*(-0.5*params['shape'][1]+mid_point[1]) + np.sin(surface_angle)*(-0.5*params['shape'][0]+mid_point[0])-beam_loc_0[1]
-        node_locs[1,:] *= scale
-
-        node_locs[1,:] = node_locs[1,:]
-        # back intersection of beam
-        node_locs[2,:] = node_locs[1,:] + box_shape[2]*params['k0_vector']/params['k0_vector'][2]
-        node_locs[3,:] = node_locs[0,:] + box_shape[2]*params['k0_vector']/params['k0_vector'][2]
-        # upper projected nodes
-        node_locs[4,:] = node_locs[0,:] + box_shape[2]*params['kh_vector']/params['kh_vector'][2]
-        node_locs[5,:] = node_locs[1,:] + box_shape[2]*params['kh_vector']/params['kh_vector'][2]
-        # bottom projected nodes
-        node_locs[6,:] = node_locs[1,:] + box_shape[2]*params['k0_vector']/params['k0_vector'][2]
-        node_locs[7,:] = node_locs[0,:] + box_shape[2]*params['k0_vector']/params['k0_vector'][2]
-        # extend back end of box to the detector
-        node_locs[4:,:] += extend_imaging_system[1]*params['kh_vector'][np.newaxis,:]/params['kh_vector'][2]
-        node_locs[:,:] += -0.5*box_shape[2]*np.array([0,0,1])
-        #
-        node_locs[[0,1,4,5],:] += 0.5*thickness_offset
-        node_locs[[2,3,6,7],:] -= 0.5*thickness_offset
-
-        # make object
-        box_node_collection = object_classes.NodeCollection(node_locs)
-        drawing.nodes.append(box_node_collection)
-        # collapse to lens?
-        if lens_scale > 0:
-            for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
-                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,0.2], abscolor=False))
-            sample_in_lens = np.copy(node_locs[4:])
-            node_locs[4:,:] = 0.01*node_locs[4:,:] +0.99*np.average(node_locs[4:,:], axis = 0)[np.newaxis, :]
-            box_node_collection = object_classes.NodeCollection(node_locs)
-            drawing.nodes.append(box_node_collection)
-            beam_to_lens = box_node_collection.node_locations
-            for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
-                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
-        else:
-            for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
-                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
-
-
-    #lens
-    if lens_scale>0:
-        magnification = 3
-        lens_radius = lens_scale*0.5*np.sqrt(2)*scale*5000#np.max([params['shape'][0],params['shape'][1]])
-        lens_pos = np.average(beam_to_lens[4:,:], axis = 0) # average position of beam in lens
-        ##[0, 0, (extend_imaging_system[1])]
-        #lens_pos[0] +=  (lens_pos[2]-0.5*box_shape[2])*params['kh_vector'][0]/params['kh_vector'][2]
-        #lens_pos[1] +=  (lens_pos[2]-0.5*box_shape[2])*params['kh_vector'][1]/params['kh_vector'][2]
-        r_curvature = lens_radius*3
-
-        delta_lens = params['kh_vector']/np.sqrt(np.sum(params['kh_vector']**2))
-        delta_lens*= 1.1*2*(r_curvature-np.sqrt(r_curvature**2-lens_radius**2))
-        num_lenses = 10
-
-        # draw scattered from lens center to detector
-        node_locs = np.zeros((8,3))
-        node_locs[:4,:] = beam_to_lens[4:,:]
-        node_locs[4:,:] = sample_in_lens
-        node_locs[4:,:] += magnification*extend_imaging_system[1]*params['kh_vector'][np.newaxis,:]/params['kh_vector'][2]
-        explode_0 = normalize(np.cross(params['Q_vector'],params['kh_vector']))
-        explode_1 = normalize(np.cross(explode_0, params['kh_vector']))
-        for i in range(4,8):
-            node_locs[i,:] += (magnification-1)*(np.dot(node_locs[i,:],explode_0)*explode_0+np.dot(node_locs[i,:],explode_1)*explode_1)
-
-        box_node_collection = object_classes.NodeCollection(node_locs)
-        drawing.nodes.append(box_node_collection)
-        for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
-            drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
-
-        node_locs[0:4,:] = sample_in_lens
-        box_node_collection = object_classes.NodeCollection(node_locs)
-        drawing.nodes.append(box_node_collection)
-        for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
-            drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,0.2], abscolor=False))
 
     if draw_scattering_arrows:
         q_arrows_scale = 1.0
@@ -260,7 +105,6 @@ def make_3d_perspective(params, export_blender_filepath=None,
         if show_text:
             ar = drawing.add_text(kh_norm*4.5*q_arrows_scale*100, 'kh')
             Q_arrows.append(ar)
-
 
     # add id06 axes
     if draw_axes:
@@ -325,6 +169,7 @@ def make_3d_perspective(params, export_blender_filepath=None,
             ar = drawing.add_text(np.copy(ar.node_locations[-1])+np.array([3,3,0]), f'𝜑 = {phi_ang:.2f}°')
         outstr.append(f'phi = {phi_ang:.2f} degrees')
     drawing.rot_z(chi)
+
     # mid part of stage
     if draw_stage:
         stage_color= np.copy(stage_color)
@@ -343,7 +188,6 @@ def make_3d_perspective(params, export_blender_filepath=None,
 
 
     drawing.rot_y(omega)
-
     # top part of stage
     if draw_stage:
         stage_color= np.copy(stage_color)
@@ -358,46 +202,34 @@ def make_3d_perspective(params, export_blender_filepath=None,
             ar = drawing.add_text(np.array([-stage_dists[5],stage_size*0.5,0]), f'𝜔 = {-omega_ang:.2f}°')
         outstr.append(f'omega = {-omega_ang:.2f} degrees')
 
-    #lens
-    if lens_scale>0:
-        magnification = 3
-        lens_radius = lens_scale*0.5*np.sqrt(2)*scale*5000#np.max([params['shape'][0],params['shape'][1]])
-        lens_pos = np.average(beam_to_lens[4:,:], axis = 0) # average position of beam in lens
-        ##[0, 0, (extend_imaging_system[1])]
-        #lens_pos[0] +=  (lens_pos[2]-0.5*box_shape[2])*params['kh_vector'][0]/params['kh_vector'][2]
-        #lens_pos[1] +=  (lens_pos[2]-0.5*box_shape[2])*params['kh_vector'][1]/params['kh_vector'][2]
-        r_curvature = lens_radius*3
-        klh = np.copy(params['kh_vector'])
-        rotate_x(klh, phi)
-        rotate_z(klh, chi)
-        rotate_y(klh, omega)
-        delta_lens = klh/np.sqrt(np.sum(klh**2))
-        delta_lens*= 1.1*2*(r_curvature-np.sqrt(r_curvature**2-lens_radius**2))
-        num_lenses = 10
-        for i in np.arange(num_lenses):
-            i-= (num_lenses-1)/2-1
-            mesh = drawing.add_lens(radius = lens_radius, num_links = 15, r_curvature = r_curvature,
-                facing = -klh, displacement = lens_pos + delta_lens*i)
+    # beam and lens
+    k0 = apply_rotation(np.copy(params['k0_vector']), phi, chi, omega, beam_stage_angle)
+    kh = apply_rotation(np.copy(params['kh_vector']), phi, chi, omega, beam_stage_angle)
+    make_beam_and_lens(drawing, sample_node_collection.node_locations, kh, params['shape'],
+            scale, extend_beam, params['beam_thickness'], params['transverse_width'],
+            beam_opacity, draw_scattered_beam, extend_imaging_system, lens_scale)
 
-    # rotate perspective nicely
-    drawing.rot_y(-90*np.pi/180)
-    drawing.rot_x(90*np.pi/180) # 95
-    #drawing.rot_y(-20*np.pi/180)
+
     # translate arrows
     if draw_scattering_arrows:
         for ar in Q_arrows:
             ar*=30/8
-            ar += np.array([15,-10,10])*30/8*q_arrows_scale*100
+            ar += np.array([-50,50,50])*q_arrows_scale*100
+            ar.rotate_x(beam_stage_angle)
 
     if draw_axes:
         for ar in xyz_arrows:
             ar*=30/8
             ar += np.array([-10,-10,-10])*30/8*xyz_arrows_scale*100
 
+    # rotate perspective nicely
+    drawing.rot_y(-90*np.pi/180)
+    drawing.rot_x(90*np.pi/180) # 95
     # move crystal_structure
     if not type(atom_list) == type(None):
         for atom in crystal_structure:
             atom += crysta_structure_position
+
 
     # draw
     drawing.draw_structure(ax)
@@ -1028,13 +860,7 @@ def rotate_z(loc,phi):
     loc[0] = x
     loc[1] = z
 
-def get_phi_chi_omega(k0,tilt_to_vector ):
-    def rot_to_vec(vec0, phi, chi, omega):
-        vec = np.copy(vec0)
-        rotate_x(vec,phi)
-        rotate_z(vec,chi)
-        rotate_y(vec,omega)
-        return vec
+def get_phi_chi_omega(k0, kh, tilt_to_vector ):
 
     phi = np.arctan2(k0[1],k0[2])
     #print(tilt_to_vector)
@@ -1043,35 +869,119 @@ def get_phi_chi_omega(k0,tilt_to_vector ):
     chi = np.arctan2(vec[1],np.sqrt(vec[0]**2+vec[2]**2))
     rotate_z(vec,chi)
     omega = -np.arctan2(vec[2],vec[0])+np.pi
-    vec2 = rot_to_vec(tilt_to_vector, phi, chi, omega)
-
-
-
+    vec2 = apply_rotation(tilt_to_vector, phi, chi, omega, 0)
+    beam_stage_angle = 0
     def rot_to_fit(inp):
         phi = inp[0]
         chi = inp[1]
         omega = inp[2]
-        vec = np.copy(tilt_to_vector)
-        vec2 = np.copy(k0)
-        rotate_x(vec,phi)
-        rotate_x(vec2,phi)
-        #chi = np.arctan2(vec[1],np.sqrt(vec[0]**2+vec[2]**2))
-        rotate_z(vec,chi)
-        rotate_z(vec2,chi)
-
-        rotate_y(vec,omega)
-        rotate_y(vec2,omega)
-        vec = vec/np.sqrt(np.sum(vec**2))
-        vec2 = vec2/np.sqrt(np.sum(vec2**2))
+        beam_stage_angle = inp[3]
+        tt_rot = normalize(apply_rotation(np.copy(tilt_to_vector), *inp))
+        k0_rot = normalize(apply_rotation(np.copy(k0), *inp))
+        kh_rot = normalize(apply_rotation(np.copy(kh), *inp))
         #print(vec, vec2)
         #print( np.abs(vec[0]-1)*1000+np.abs(vec[2])+np.abs(vec[1])+np.abs(vec2[0])+np.abs(vec2[1]))
+        k0_e = np.abs(k0_rot[0])+np.abs(k0_rot[1])+k0_rot[2]
+        kh_e = np.abs(kh_rot[1])
+        tt_e = np.abs(tt_rot[2]-1)
+        return k0_e + kh_e + tt_e
         return np.abs(vec[0]-1)+np.abs(vec2[2]-1)+np.abs(vec[2])+np.abs(vec[1])+np.abs(vec2[0])+np.abs(vec2[1])# + np.abs(params['k0_vector'][0]) + np.abs(params['k0_vector'][1])
 
-    out= scipy.optimize.minimize(rot_to_fit,np.array([phi,chi,omega]), tol=10**-10)
+    out= scipy.optimize.minimize(rot_to_fit,np.array([phi,chi,omega, beam_stage_angle]), tol=10**-10)
     #print(out)
     phi = out['x'][0]
     chi = out['x'][1]
     omega = out['x'][2]
-    vec2 = rot_to_vec(tilt_to_vector, phi, chi, omega)
-    beam_stage_angle = 10
-    return chi, phi, omega, beam_stage_angle
+    beam_stage_angle = out['x'][3]
+    return phi, chi, omega, beam_stage_angle
+
+def apply_rotation(vec, phi, chi, omega, beam_stage_angle):
+    rotate_x(vec, phi)
+    rotate_z(vec, chi)
+    rotate_y(vec, omega)
+    rotate_x(vec, beam_stage_angle)
+    return vec
+
+
+def make_beam_and_lens(drawing, sample_nodes, kh, shape, scale, extend_beam, beam_thickness, transverse_width, beam_opacity, draw_scattered_beam, extend_imaging_system, lens_scale):
+    # add beam
+    if not type(extend_beam) == type(None):
+        node_locs = np.zeros((8,3))
+        node_locs[[0,1,4,5],0] += 0.5*beam_thickness*scale
+        node_locs[[2,3,6,7],0] -= 0.5*beam_thickness*scale
+        node_locs[[0,3,4,7],1] += 0.5*transverse_width*scale
+        node_locs[[2,1,6,5],1] -= 0.5*transverse_width*scale
+        node_locs[0:4,2] -= extend_beam[0]*scale
+        node_locs[4:,2]  += extend_beam[1]*scale
+        beam_node_locs = np.copy(node_locs)
+        box_node_collection = object_classes.NodeCollection(node_locs)
+        drawing.nodes.append(box_node_collection)
+        if 1:
+            for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
+                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
+        #drawing.objects.append(object_classes.BoxFacet(box_node_collection, [0,1,2,3], facecolor = [1,0.6,0,beam_opacity*2], abscolor=False))
+        #drawing.objects.append(object_classes.BoxFacet(box_node_collection, [0,1,2,3], facecolor = [1,0.6,0,beam_opacity*2], abscolor=False))
+    sample_norm = np.cross(sample_nodes[1]-sample_nodes[0],sample_nodes[2]-sample_nodes[0])
+    lens_center = normalize(kh)*extend_imaging_system[1]
+    # scattered beam to lens
+    if draw_scattered_beam:
+        node_locs = np.zeros((8,3))
+        node_locs[0] = line_plane_collision(sample_norm, sample_nodes[0], beam_node_locs[0], beam_node_locs[4])
+        node_locs[1] = line_plane_collision(sample_norm, sample_nodes[0], beam_node_locs[1], beam_node_locs[5])
+        node_locs[2] = line_plane_collision(sample_norm, sample_nodes[4], beam_node_locs[2], beam_node_locs[6])
+        node_locs[3] = line_plane_collision(sample_norm, sample_nodes[4], beam_node_locs[3], beam_node_locs[7])
+        for i in range(4,8):
+            node_locs[i] = line_plane_collision(kh, lens_center, node_locs[i-4], node_locs[i-4]+kh)
+        sample_in_lens = np.copy(node_locs[4:])
+        # make object
+        box_node_collection = object_classes.NodeCollection(node_locs)
+        drawing.nodes.append(box_node_collection)
+        if 1: # projection along kh
+            for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
+                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,0.25], abscolor=False))
+        node_locs[4:] = 0.01*node_locs[4:]+0.99*np.average(node_locs[4:],axis = 0)
+        box_node_collection = object_classes.NodeCollection(node_locs)
+        drawing.nodes.append(box_node_collection)
+        if lens_scale>0:
+            for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
+                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
+    # lens
+    if lens_scale>0:
+        lens_radius = lens_scale*0.5*np.sqrt(2)*scale*5000#np.max([params['shape'][0],params['shape'][1]])
+        r_curvature = lens_radius*3
+        delta_lens = normalize(kh)
+        delta_lens*= 1.1*2*(r_curvature-np.sqrt(r_curvature**2-lens_radius**2))
+        num_lenses = 10
+        for i in np.arange(num_lenses):
+            i-= (num_lenses-1)/2-1
+            mesh = drawing.add_lens(radius = lens_radius, num_links = 15, r_curvature = r_curvature,
+                facing = -kh, displacement = lens_center + delta_lens*i)
+    # beam behind lens
+    if lens_scale>0:
+        magnification = 3
+        node_locs = np.zeros((8,3))
+        node_locs[:4] = sample_in_lens
+        node_locs[4:] = sample_in_lens*3+lens_center
+        # make object
+        box_node_collection = object_classes.NodeCollection(node_locs)
+        drawing.nodes.append(box_node_collection)
+        if 1: # projection along kh
+            for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
+                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,0.25], abscolor=False))
+        node_locs[:4] = 0.01*node_locs[:4]+0.99*np.average(node_locs[:4],axis = 0)
+        box_node_collection = object_classes.NodeCollection(node_locs)
+        drawing.nodes.append(box_node_collection)
+        if lens_scale>0:
+            for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
+                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
+
+    return
+
+
+def line_plane_collision(plane_norm, plane_point, line_start, line_end):
+    direction = line_end-line_start
+    ndotu = plane_norm.dot(direction)
+    w = line_start - plane_point
+    si = -plane_norm.dot(w) / ndotu
+    Psi = w + si * direction + plane_point
+    return Psi

@@ -15,6 +15,13 @@ import helpers
 import draw_crystal_structures
 import three_d_draw
 import three_d_draw_object_classes
+import base64
+def get_binary_file_downloader_html(bin_file, file_label='File'):
+    with open(bin_file, 'rb') as f:
+        data = f.read()
+    bin_str = base64.b64encode(data).decode()
+    href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
+    return href
 
 import importlib
 
@@ -112,7 +119,6 @@ if uploaded_file is not None or crystal != 'Upload':
 
     shape_µm = np.array([sample_height,sample_width,sample_thickness])
     params['shape'] = shape_µm
-    params['mid'] = np.array([0.5, 0.5]) # axis 0, axis 1
 
     ''' get scatter function based on dan's diffraction
         Dan's diffraction reads cif files and is used to calculate correct atomic positions for scattering
@@ -200,6 +206,7 @@ if uploaded_file is not None or crystal != 'Upload':
     st.sidebar.markdown('Crystal-sample geometry')
     up_hkl_str = st.sidebar.text_input("Sample 'up' (h,k,l) or [u,v,w,]", '') #min, max, default
     front_hkl_str = st.sidebar.text_input('Exit surface ~(h,k,l) or ~[u,v,w,]', '') #min, max, default
+    st.sidebar.write("For the exit surface, only the component orthogonal to sample 'up' is perserved")
 
     if not up_hkl_str == '':
         s = up_hkl_str.strip('[()]').split(',')
@@ -273,10 +280,11 @@ if uploaded_file is not None or crystal != 'Upload':
     k_abs = 2*np.pi/lmbd
     Q = np.linalg.norm(params['Q_vector'])
     st.sidebar.markdown('Beam-crystal geometry')
-    beam_exit_hkl_str = st.sidebar.text_input('Beam exit direction ~(h,k,l) or ~[u,v,w,]', '') #min, max, default
-    st.sidebar.write("For the 'exit surface' and 'sampe up' vectors, only the component orthogonal to Q is perserved")
-
-    if not beam_exit_hkl_str == '':
+    is_beam_norm = st.sidebar.checkbox("minimize distance beam travels through sample", True)
+    if not is_beam_norm:
+        beam_exit_hkl_str = st.sidebar.text_input('Beam exit direction ~(h,k,l) or ~[u,v,w,]', '') #min, max, default
+        st.sidebar.write("For the 'Beam exit direction', only the component orthogonal to Q is perserved")
+    if not is_beam_norm and not beam_exit_hkl_str == '':
         s = beam_exit_hkl_str.strip('[()]').split(',')
         beam_exit_hkl = np.array([float(s[0]),float(s[1]),float(s[2])])
         if '(' in beam_exit_hkl_str:
@@ -359,19 +367,21 @@ if uploaded_file is not None or crystal != 'Upload':
         show_text = st.sidebar.checkbox("show text", show_text)
 
     def make_crystal_structure():
-            return draw_crystal_structures.add_crystal_structure( cif_file, scale = crystal_scale,
-                        rotation_function = crystal_rotation_function,
-                        legend_pos_shift = legend_pos_shift,
-                        axes_shift = crystal_axes_shift,
-                        max_bond_length = max_bond_length, min_bond_length = min_bond_length,
-                        linewidth = 3,
-                        bounding_box_facecolor = [0.5,0.6,0.7,0],
-                        cage_line_color = [0.8,0.8,0.8,1],
-                        linecolor = [0.5,0.5,0.5,1],
-                        show_text = show_text,
-                        cage_list = cage_list,
-                        make_bonds = make_bonds
-                        )
+        Q = crystal_rotation_function(xtl.Cell.calculateQ(params['hkl'])[0])
+        return draw_crystal_structures.add_crystal_structure( cif_file, scale = crystal_scale,
+                    rotation_function = crystal_rotation_function,
+                    legend_pos_shift = legend_pos_shift,
+                    axes_shift = crystal_axes_shift,
+                    max_bond_length = max_bond_length, min_bond_length = min_bond_length,
+                    linewidth = 3,
+                    bounding_box_facecolor = [0.5,0.6,0.7,0],
+                    cage_line_color = [0.8,0.8,0.8,1],
+                    linecolor = [0.5,0.5,0.5,1],
+                    show_text = show_text,
+                    cage_list = cage_list,
+                    make_bonds = make_bonds,
+                    #atom_legend_step = Q/np.sqrt(np.sum(Q**2)),
+                    )
 
     drawing, fig, ax, outstr = three_d_draw.make_3d_perspective(params,
                 export_blender_filepath = 'DF_XRM_vis_to_blender.pickled',
@@ -400,7 +410,9 @@ if uploaded_file is not None or crystal != 'Upload':
     ########################### print to pdf ##############################
     #######################################################################
 
-    if 1:
+
+    make_pdf = st.checkbox("make pdf")
+    if make_pdf:
         pdf = fpdf.FPDF(orientation = 'P', unit = 'mm', format = 'A4')
         pdf.add_page()
         pdf.set_font('helvetica', '', 10)
@@ -465,13 +477,6 @@ if uploaded_file is not None or crystal != 'Upload':
         pdf.multi_cell(0, 4, tab, 0, 1,'L', False)
         pdf.output('DF-XRM_vis.pdf')
 
-        import base64
-        def get_binary_file_downloader_html(bin_file, file_label='File'):
-            with open(bin_file, 'rb') as f:
-                data = f.read()
-            bin_str = base64.b64encode(data).decode()
-            href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
-            return href
         st.markdown(get_binary_file_downloader_html('DF-XRM_vis.pdf', 'pdf'), unsafe_allow_html=True)
 
     st.markdown(get_binary_file_downloader_html('DF_XRM_vis_to_blender.pickled', 'pickled 3d structure for blender'), unsafe_allow_html=True)

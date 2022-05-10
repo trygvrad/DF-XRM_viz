@@ -8,7 +8,8 @@ def add_crystal_structure( cif_file, scale = 4.0, rotation_function = None, lege
                             bounding_box_facecolor = [0,0,0,0],
                             cage_line_color = [0,0,0,1],
                             linecolor = [1,1,1,1],
-                            show_text = True):
+                            show_text = True,
+                            atom_legend_step = np.array([1,0,0])):
     '''
     adds a crystal structure
     input:
@@ -21,6 +22,7 @@ def add_crystal_structure( cif_file, scale = 4.0, rotation_function = None, lege
         axes_shift: default None, position of the axes of form [0,2,0] etc.
         make_bonds: atoms to make bonds between, i.e. ['Ti','O']
         show_text: if True, show text
+        atom_legend_step: step for each atom in the legend, should be a vector pointing up in the final figure
     returns:
         list of objects
     '''
@@ -183,7 +185,7 @@ def add_crystal_structure( cif_file, scale = 4.0, rotation_function = None, lege
         objects.append(atom)
         atom *= scale
         atom += legend_pos
-        atom+=np.array([-2*i,0,0])*scale
+        atom += -2*atom_legend_step*i*scale
         if show_text:
             text = object_classes.Text(np.copy(atom.loc)+np.array([0,0,0.8])*scale, a_typ, color=[0,0,0,1], scale=0.9)
             objects.append(text)
