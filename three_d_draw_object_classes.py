@@ -37,38 +37,28 @@ def get_color(color, normal):
         output:
             color
         '''
+        # ensure 2d input
+        was_two_d = True
         if len(np.array(normal).shape) == 1: # 1D array:
-            # opacity
-            thickness = 1/np.abs(normal[2])
-            color = np.array(color, dtype = float)
-            new_color_3 = 1-(1-color[3])**thickness
-            color[3] = color[3] + (new_color_3-color[3])*opacity_change_from_angle
-            # brightness
-            thickness_inv = np.abs(np.sum(normal*light_direction))
-            if thickness_inv>0.5:
-                f = (thickness_inv-0.5)#*2
-                if f>1:
-                    print(f)
-                color[0:3] = (1-f)*color[0:3] + f*np.array([1,1,1])
-            else:
-                f = (thickness_inv)#*2
-                color[0:3] = f*color[0:3] + (1-f)*np.array([0,0,0])
-            return color
-        else: # 2D array of shape (N,3)
-            color=np.array(color, dtype = float)
-            colors = np.zeros((normal.shape[0],4))
-            # opacity
-            thicknesses = 1/np.abs(normal[:,2])
-            new_colors_3 = 1-(1-color[3])**thicknesses
-            colors[:,3] = color[3] + (new_colors_3-color[3])*opacity_change_from_angle
-            # brightness
-            thickness_inv = np.abs(np.sum(normal*light_direction[np.newaxis,:], axis=1))
-            f = (thickness_inv[thickness_inv>=0.5]-0.5)#*1.5
-            colors[thickness_inv>=0.5,0:3] = (1-f[:,np.newaxis])*color[np.newaxis,0:3]+ f[:,np.newaxis]*np.ones((1,3))
-            f = 1-(0.5-thickness_inv[thickness_inv<0.5])#*1.5
-            colors[thickness_inv<0.5,0:3] = f[:,np.newaxis]*color[np.newaxis,0:3] #+ (1-f)*np.zeros((1,3))
+            was_two_d = False
+            normal = np.reshape(normal,(1,3))
+        # prepare
+        color=np.array(color, dtype = float)
+        colors = np.zeros((normal.shape[0],4))
+        # opacity
+        thicknesses = 1/np.abs(normal[:,2])
+        new_colors_3 = 1-(1-color[3])**thicknesses
+        colors[:,3] = color[3] + (new_colors_3-color[3])*opacity_change_from_angle
+        # brightness
+        thickness_inv = np.abs(np.sum(normal*light_direction[np.newaxis,:], axis=1))
+        f = (thickness_inv[thickness_inv>=0.5]-0.5)#*1.5
+        colors[thickness_inv>=0.5,0:3] = (1-f[:,np.newaxis])*color[np.newaxis,0:3]+ f[:,np.newaxis]*np.ones((1,3))
+        f = 1-(0.5-thickness_inv[thickness_inv<0.5])#*1.5
+        colors[thickness_inv<0.5,0:3] = f[:,np.newaxis]*color[np.newaxis,0:3] #+ (1-f)*np.zeros((1,3))
+        if was_two_d:
             return colors
-
+        else:
+            return colors[0]
 class Text:
     def __init__(self,location, text, color=[0,0,0,1], scale =0.5):
         self.color=color
@@ -318,8 +308,8 @@ class BoxFacet:
         return:
             colors: len (4) array corresponding to color + opacity
         '''
-        normal = np.cross(   self.node_collection.node_locations[self.corner_nodes[1]] - self.node_collection.node_locations[self.corner_nodes[0]]
-                            ,self.node_collection.node_locations[self.corner_nodes[1]] - self.node_collection.node_locations[self.corner_nodes[2]])
+        normal = np.cross(   self.node_collection.node_locations[self.corner_nodes[0]] - self.node_collection.node_locations[self.corner_nodes[1]]
+                            ,self.node_collection.node_locations[self.corner_nodes[2]] - self.node_collection.node_locations[self.corner_nodes[1]])
         normal = normal/np.sqrt(np.sum(normal**2))
         color = get_color(self.facecolor, normal)
         return color

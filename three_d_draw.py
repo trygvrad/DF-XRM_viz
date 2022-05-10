@@ -10,7 +10,6 @@ def make_3d_perspective(params, export_blender_filepath=None,
                 # deals with rendering the figure
                 crystal_rotation_function = None,
                 scale = 0.1,
-                tilt_to_vector = None,
                 # deals with additional objects to render
                 atom_list = None, crysta_structure_position = [-70, -10, 60],
                 extend_beam = (1000,0), beam_opacity = 1,
@@ -34,7 +33,6 @@ def make_3d_perspective(params, export_blender_filepath=None,
 
         crystal_rotation_function: function tha takes an array of lenght three describing a vector in the crystal basis, and returns the vector in simulation coordiantes
         scale: float default = 0.1, multiplication factor for the simulated volume
-        tilt_to_vector: vector of lenght 3 that defines 'up' or none
 
         atom_list: None or list of atoms and other objects to render crystal structure
         crysta_structure_position: position to render the crystal strcuture (with respect to the volume center of the simulated volume. This is in the coordinate system of the drawing: [horizontal, vertical, out-of-plane]
@@ -63,13 +61,7 @@ def make_3d_perspective(params, export_blender_filepath=None,
     ax['data'] = []
     ax['annotations'] = []
 
-    if not type(tilt_to_vector) == type(None):  # tilt fig rotation
-        phi, chi, omega, beam_stage_angle = get_phi_chi_omega(params['k0_vector'], params['kh_vector'], tilt_to_vector )
-    else:
-        chi = 0
-        phi = 0
-        omega = 0
-        beam_stage_angle = 0
+    phi, chi, omega, beam_stage_angle = get_phi_chi_omega(params['k0_vector'], params['kh_vector'] )
     drawing = Drawing()
     # add crystal structure if cif specified
     if not type(atom_list) == type(None):
@@ -241,6 +233,7 @@ def make_3d_perspective(params, export_blender_filepath=None,
         up=dict(x=0, y=1, z=0),
         center=dict(x=0, y=0, z=0),
         eye=dict(x=-0.2, y=0.4, z=2),
+        #eye=dict(x=-0, y=0, z=2),
         projection = dict(
         type="orthographic",
         ),
@@ -860,34 +853,35 @@ def rotate_z(loc,phi):
     loc[0] = x
     loc[1] = z
 
-def get_phi_chi_omega(k0, kh, tilt_to_vector ):
+def get_phi_chi_omega(k0, kh):
 
     phi = np.arctan2(k0[1],k0[2])
-    #print(tilt_to_vector)
-    vec = np.copy(tilt_to_vector)
+    beam_plane_normal = np.cross(k0,np.cross(k0,kh))
+    vec = np.copy(beam_plane_normal)
     rotate_x(vec,phi)
     chi = np.arctan2(vec[1],np.sqrt(vec[0]**2+vec[2]**2))
     rotate_z(vec,chi)
     omega = -np.arctan2(vec[2],vec[0])+np.pi
-    vec2 = apply_rotation(tilt_to_vector, phi, chi, omega, 0)
+
     beam_stage_angle = 0
     def rot_to_fit(inp):
         phi = inp[0]
         chi = inp[1]
         omega = inp[2]
         beam_stage_angle = inp[3]
-        tt_rot = normalize(apply_rotation(np.copy(tilt_to_vector), *inp))
+        tt_rot = normalize(apply_rotation(np.copy(beam_plane_normal), *inp))
         k0_rot = normalize(apply_rotation(np.copy(k0), *inp))
         kh_rot = normalize(apply_rotation(np.copy(kh), *inp))
-        #print(vec, vec2)
-        #print( np.abs(vec[0]-1)*1000+np.abs(vec[2])+np.abs(vec[1])+np.abs(vec2[0])+np.abs(vec2[1]))
-        k0_e = np.abs(k0_rot[0])+np.abs(k0_rot[1])+k0_rot[2]
+        # k0 should point pure [2], kh
+        # should have no [1]
+        # tt_rot is the beam_plane_normal (pointing down!), i.e. this should be pure -[0]
+        k0_e = np.abs(k0_rot[0])+np.abs(k0_rot[1])#-k0_rot[2]
         kh_e = np.abs(kh_rot[1])
-        tt_e = np.abs(tt_rot[2]-1)
+        tt_e = np.abs(tt_rot[0]+1)
         return k0_e + kh_e + tt_e
-        return np.abs(vec[0]-1)+np.abs(vec2[2]-1)+np.abs(vec[2])+np.abs(vec[1])+np.abs(vec2[0])+np.abs(vec2[1])# + np.abs(params['k0_vector'][0]) + np.abs(params['k0_vector'][1])
 
-    out= scipy.optimize.minimize(rot_to_fit,np.array([phi,chi,omega, beam_stage_angle]), tol=10**-10)
+    out= scipy.optimize.minimize(rot_to_fit,np.array([phi,chi,omega, beam_stage_angle]), tol=10**-10, method = 'Nelder-Mead')
+
     #print(out)
     phi = out['x'][0]
     chi = out['x'][1]
@@ -904,6 +898,7 @@ def apply_rotation(vec, phi, chi, omega, beam_stage_angle):
 
 
 def make_beam_and_lens(drawing, sample_nodes, kh, shape, scale, extend_beam, beam_thickness, transverse_width, beam_opacity, draw_scattered_beam, extend_imaging_system, lens_scale):
+    beam_color = [1,0.6,0]
     # add beam
     if not type(extend_beam) == type(None):
         node_locs = np.zeros((8,3))
@@ -918,9 +913,9 @@ def make_beam_and_lens(drawing, sample_nodes, kh, shape, scale, extend_beam, bea
         drawing.nodes.append(box_node_collection)
         if 1:
             for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
-                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
-        #drawing.objects.append(object_classes.BoxFacet(box_node_collection, [0,1,2,3], facecolor = [1,0.6,0,beam_opacity*2], abscolor=False))
-        #drawing.objects.append(object_classes.BoxFacet(box_node_collection, [0,1,2,3], facecolor = [1,0.6,0,beam_opacity*2], abscolor=False))
+                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [*beam_color,beam_opacity], abscolor=False))
+        #drawing.objects.append(object_classes.BoxFacet(box_node_collection, [0,1,2,3], facecolor = [*beam_color,beam_opacity*2], abscolor=False))
+        #drawing.objects.append(object_classes.BoxFacet(box_node_collection, [0,1,2,3], facecolor = [*beam_color,beam_opacity*2], abscolor=False))
     sample_norm = np.cross(sample_nodes[1]-sample_nodes[0],sample_nodes[2]-sample_nodes[0])
     lens_center = normalize(kh)*extend_imaging_system[1]
     # scattered beam to lens
@@ -938,13 +933,13 @@ def make_beam_and_lens(drawing, sample_nodes, kh, shape, scale, extend_beam, bea
         drawing.nodes.append(box_node_collection)
         if 1: # projection along kh
             for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
-                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,0.25], abscolor=False))
+                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [*beam_color,0.25], abscolor=False))
         node_locs[4:] = 0.01*node_locs[4:]+0.99*np.average(node_locs[4:],axis = 0)
         box_node_collection = object_classes.NodeCollection(node_locs)
         drawing.nodes.append(box_node_collection)
         if lens_scale>0:
             for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
-                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
+                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [*beam_color,beam_opacity], abscolor=False))
     # lens
     if lens_scale>0:
         lens_radius = lens_scale*0.5*np.sqrt(2)*scale*5000#np.max([params['shape'][0],params['shape'][1]])
@@ -967,13 +962,13 @@ def make_beam_and_lens(drawing, sample_nodes, kh, shape, scale, extend_beam, bea
         drawing.nodes.append(box_node_collection)
         if 1: # projection along kh
             for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
-                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,0.25], abscolor=False))
+                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [*beam_color,0.25], abscolor=False))
         node_locs[:4] = 0.01*node_locs[:4]+0.99*np.average(node_locs[:4],axis = 0)
         box_node_collection = object_classes.NodeCollection(node_locs)
         drawing.nodes.append(box_node_collection)
         if lens_scale>0:
             for seg in [[0,1,2,3],[4,5,6,7],[0,4,7,3],[7,3,2,6],[2,6,5,1],[5,1,0,4]]:
-                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [1,0.6,0,beam_opacity], abscolor=False))
+                drawing.objects.append(object_classes.BoxFacet(box_node_collection, seg, facecolor = [*beam_color,beam_opacity], abscolor=False))
 
     return
 

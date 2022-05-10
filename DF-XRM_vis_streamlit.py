@@ -120,7 +120,8 @@ if uploaded_file is not None or crystal != 'Upload':
     shape_µm = np.array([sample_height,sample_width,sample_thickness])
     params['shape'] = shape_µm
 
-    ''' get scatter function based on dan's diffraction
+    if 0:
+        ''' The scatter function based on dan's diffraction
         Dan's diffraction reads cif files and is used to calculate correct atomic positions for scattering
         Dan's diffraction does not include a function for anomalous scattering, but this has been made based on xrddb and is assigned separately
         '''
@@ -204,8 +205,8 @@ if uploaded_file is not None or crystal != 'Upload':
         '''
 
     st.sidebar.markdown('Crystal-sample geometry')
-    up_hkl_str = st.sidebar.text_input("Sample 'up' (h,k,l) or [u,v,w,]", '') #min, max, default
-    front_hkl_str = st.sidebar.text_input('Exit surface ~(h,k,l) or ~[u,v,w,]', '') #min, max, default
+    up_hkl_str = st.sidebar.text_input("Sample 'up' (h,k,l) or [u,v,w,] (z-arrow in figure)", '') #min, max, default
+    front_hkl_str = st.sidebar.text_input('Exit surface ~(h,k,l) or ~[u,v,w,] (x-arrow in figure)', '') #min, max, default
     st.sidebar.write("For the exit surface, only the component orthogonal to sample 'up' is perserved")
 
     if not up_hkl_str == '':
@@ -317,7 +318,6 @@ if uploaded_file is not None or crystal != 'Upload':
     x = np.sqrt(  ( k_abs**2 - 0.25*Q**2 ) / ( k_ort_l**2) )
     params['k0_vector'] = -0.5*params['Q_vector'] + x*k_dir_orthogonal_to_Q
     params['kh_vector'] = 0.5*params['Q_vector'] + x*k_dir_orthogonal_to_Q
-    beam_plane_normal = np.cross(params['k0_vector'],np.cross(params['k0_vector'],params['Q_vector']))
     twotheta = 2*np.arcsin(np.sqrt(np.sum(params['Q_vector']**2))*params['wavelength_in_um']/4/np.pi)*180/np.pi
     st.write(f'Instrument alignment on [{"".join(hkl_spli)}]:  \n 2𝜃 = {twotheta:.3f}')
 
@@ -387,7 +387,6 @@ if uploaded_file is not None or crystal != 'Upload':
                 export_blender_filepath = 'DF_XRM_vis_to_blender.pickled',
                 crystal_rotation_function = crystal_rotation_function,
                 scale = scale,
-                tilt_to_vector = beam_plane_normal,
                 atom_list = make_crystal_structure(),
                 crysta_structure_position = crysta_structure_position,
                 extend_beam = extend_beam,
