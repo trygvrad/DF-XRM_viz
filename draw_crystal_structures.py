@@ -24,7 +24,7 @@ def add_crystal_structure( cif_file, scale = 4.0, rotation_function = None, lege
         show_text: if True, show text
         atom_legend_step: step for each atom in the legend, should be a vector pointing up in the final figure
     returns:
-        list of objects
+        list of three_d_draw_object_classes objects
     '''
     import Dans_Diffraction
     xtl = Dans_Diffraction.Crystal(cif_file)

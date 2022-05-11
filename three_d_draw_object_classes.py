@@ -15,23 +15,19 @@ def rotate(x,z,phi):
     '''
     return x*np.cos(phi)-z*np.sin(phi),z*np.cos(phi)+x*np.sin(phi)
 
-opacity_change_from_angle = 0.5
 brightness_change_from_angle = 0.5
-light_direction = np.array([0.5, 1, 0.25])
+light_direction = np.array([0.3, 1, 0.25])
 light_direction = light_direction/np.sqrt(np.sum(light_direction**2))
 
 def get_color(color, normal):
         '''
-        Calculates the color and opacity based on the angle of the normal
-        Imagine that the facet is made from glass, transparent if you look at it head-on,
-            but opaqe if at an oblice angle
-        -> opacity depends on the relationship between the normal and the [0,0,1] direction (camera)
+        Calculates the color based on the angle of the normal
         -> brightness with respect to the normal and the light_direction
+        For simplicity, the object is as illuminated by both light_direction and -light_direction
         input:
             color: np.array of size 4 [r,g,b,a]
             normal: np.array of size 3 [x,y,z] or 2d np.array of shape (N,3)
         global values:
-            opacity_change_from_angle: float from 0 to 1, fraction of change to apply
             brightness_change_from_angle: float from 0 to 1, fraction of change to apply
             light_direction: [x,y,z] the direction of illumination, must be normalized to length = 1
         output:
@@ -45,10 +41,11 @@ def get_color(color, normal):
         # prepare
         color=np.array(color, dtype = float)
         colors = np.zeros((normal.shape[0],4))
-        # opacity
-        thicknesses = 1/np.abs(normal[:,2])
+        # opacity # since we allow the user to move the figure in 3d we don't want to change the opacity
+        '''thicknesses = 1/np.abs(normal[:,2])
         new_colors_3 = 1-(1-color[3])**thicknesses
-        colors[:,3] = color[3] + (new_colors_3-color[3])*opacity_change_from_angle
+        colors[:,3] = color[3] + (new_colors_3-color[3])*opacity_change_from_angle'''
+        colors[:,3] = color[3]
         # brightness
         thickness_inv = np.abs(np.sum(normal*light_direction[np.newaxis,:], axis=1))
         f = (thickness_inv[thickness_inv>=0.5]-0.5)#*1.5
@@ -60,7 +57,7 @@ def get_color(color, normal):
         else:
             return colors[0]
 class Text:
-    def __init__(self,location, text, color=[0,0,0,1], scale =0.5):
+    def __init__(self, location, text, color=[0,0,0,1], scale =0.5):
         self.color=color
         self.loc = location
         self.text = text
@@ -136,15 +133,15 @@ class NodeCollection:
     Class that maintains node collections
         member variables:
             node_locations = locations of nodes in 3d
-            loc = 'center', used to sort objects as layers before plotting them
         member functions:
             rotate_x: rotates around x axis (horisontal)
             rotate_y: rotates around y axis (vertical)
             rotate_z: rotates around z axis (out-of-plane)
+            +=: translation
+            *=: magnify
     '''
     def __init__(self,node_locations):
         self.node_locations=np.array(node_locations)
-        self.loc=np.average(self.node_locations, axis=0)
     def rotate_x(self,phi):
         '''
         rotate_x: rotates around x axis (horisontal)
@@ -154,7 +151,6 @@ class NodeCollection:
             x,z=rotate(loc[1],loc[2],phi)
             self.node_locations[i,1] = x
             self.node_locations[i,2] = z
-        self.loc=np.average(self.node_locations, axis=0)
     def rotate_y(self,phi):
         '''
         rotate_y: rotates around y axis (vertical)
@@ -164,7 +160,6 @@ class NodeCollection:
             x,z=rotate(loc[0],loc[2],phi)
             self.node_locations[i,0] = x
             self.node_locations[i,2] = z
-        self.loc=np.average(self.node_locations, axis=0)
     def rotate_z(self,phi):
         '''
         rotate_z: rotates around z axis (out-of-plane)
@@ -174,7 +169,6 @@ class NodeCollection:
             x,z=rotate(loc[0],loc[1],phi)
             self.node_locations[i,0] = x
             self.node_locations[i,1] = z
-        self.loc=np.average(self.node_locations, axis=0)
     def __iadd__(self,vec):
         '''
         overload of the += operator to shift the node locations
@@ -230,16 +224,10 @@ class Mesh(NodeCollection):
 
     def draw(self,ax):
         '''
-            Renders the trainglemesh
+            adds this object to the 'data' entry in the plotly dictionary ax
         '''
         if not self.abscolor:
             colors = self.get_colors()
-        if not self.abscolor:
-            #self.facecolor = np.array(self.facecolor)
-            #facecolor = np.zeros(self.facecolor.shape)
-            #colors[:3] = np.array(colors[:3]*256,dtype = int)
-            #colors[3] = colors[3]
-            #print(colors)
             data = plotly.graph_objects.Mesh3d(
                             x = self.node_locations[:,0],
                             y = self.node_locations[:,1],
@@ -268,7 +256,13 @@ class Mesh(NodeCollection):
                             k = self.faces[:,2],
                           hoverinfo='skip')
             ax['data'].append(data)
+
     def to_dict(self):
+        '''
+        converts the object to a dictionary so that it can be exported to blender as part of a picle
+        return:
+            dictionary
+        '''
         dic = {
             'type':'Mesh',
             'nodes':self.node_locations,
@@ -315,7 +309,7 @@ class BoxFacet:
         return color
     def draw(self,ax):
         '''
-            Renders the facet
+            adds this object to the 'data' entry in the plotly dictionary ax
         '''
         self.facecolor = np.array(self.facecolor)
         if not self.abscolor:
@@ -342,6 +336,11 @@ class BoxFacet:
 
 
     def to_dict(self):
+        '''
+        converts the object to a dictionary so that it can be exported to blender as part of a picle
+        return:
+            dictionary
+        '''
         dic = {
             'type':'BoxFacet',
             'span':self.node_collection.node_locations[self.corner_nodes],
@@ -367,9 +366,8 @@ class BoxLine:
         self.linewidth = linewidth
     def draw(self,ax):
         '''
-            Renders the line
+            adds this object to the 'data' entry in the plotly dictionary ax
         '''
-
         locs = self.node_collection.node_locations[self.corner_nodes]
         data = plotly.graph_objects.Scatter3d(
                         x = locs[:,0],
@@ -385,6 +383,11 @@ class BoxLine:
         ax['data'].append(data)
 
     def to_dict(self):
+        '''
+        converts the object to a dictionary so that it can be exported to blender as part of a picle
+        return:
+            dictionary
+        '''
         dic = {
             'type':'BoxLine',
             'span':self.node_collection.node_locations[self.corner_nodes],
@@ -435,10 +438,10 @@ class Atom:
 
     def draw(self,ax):
         '''
-            Renders the atom
+            adds this object as an isochahedron to the 'data' entry in the plotly dictionary ax
         '''
         vertices = isochahedron_vertices*self.radius+self.loc
-        # get colors colors (same as for meshes)
+        # get colors (same as for meshes)
         colors = np.ones((isochahedron_faces.shape[0],4))
         p0 = vertices[isochahedron_faces[:,0]]
         p1 = vertices[isochahedron_faces[:,1]]
@@ -486,6 +489,11 @@ class Atom:
         self.loc[1]=z
 
     def to_dict(self):
+        '''
+        converts the object to a dictionary so that it can be exported to blender as part of a picle
+        return:
+            dictionary
+        '''
         vertices = isochahedron_vertices*self.radius+self.loc
         # get colors colors (same as for meshes)
         colors = np.ones((isochahedron_faces.shape[0],4))
@@ -507,17 +515,6 @@ class Atom:
         }
         return dic
 
-def get_circ(points_in_circ=64):
-    '''
-    maxes a circle in 2d for plotting atoms in matplotlib
-    '''
-    circ_x=[]
-    circ_y=[]
-    for i in range(points_in_circ):
-        an=2*np.pi*i/points_in_circ
-        circ_x.append(np.sin(an))
-        circ_y.append(np.cos(an))
-    return np.array(circ_x),np.array(circ_y)
 
 radius_and_color_list=[
 [1, 'H', 0.46, 1.20, 0.200, 1.00000, 0.80000, 0.80000],

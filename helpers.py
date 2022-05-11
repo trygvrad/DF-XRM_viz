@@ -2,28 +2,45 @@ import numpy as np
 import matplotlib.pyplot as plt
 import Dans_Diffraction
 import xraydb
-def att_length(xtl,energy_kev):
+def att_length(xtl,energies_kev):
+    '''
+    calculates attenuation length
+    input:
+        xtl, Dans_Diffraction.Crystal() object
+        energies_kev, 1d array of floats or float, energies in keV
+    return:
+        1d numpy array of floats or float, attenuation length(s) in µm
+    '''
     atom_type = xtl.Structure.type
     occ = xtl.Structure.occupancy
     natoms = np.sum(occ)
     vol = xtl.Properties.volume()*10**6/10**30 #Å^3
     weight = Dans_Diffraction.fc.atom_properties(atom_type, 'Weight')/(6.02214076*10**23)
     #st.write(weight)
-    mu =  occ[0]*weight[0]*xraydb.mu_elam(atom_type[0], energy_kev*1000)
-    #mu +=  occ[0]*weight[0]*xraydb.incoherent_cross_section_elam(atom_type[0], energy_kev*1000)
+    mu =  occ[0]*weight[0]*xraydb.mu_elam(atom_type[0], energies_kev*1000)
+    #mu +=  occ[0]*weight[0]*xraydb.incoherent_cross_section_elam(atom_type[0], energies_kev*1000)
     # Values returned are in units of cm^2/gr # here mutiplied by weight
     for i in range(1,len(occ)):
-        mu +=  occ[i]*weight[i]*xraydb.mu_elam(atom_type[i], energy_kev*1000)#photoabsorption_crosssection(elements, energy_kev)
-        #mu +=  occ[0]*weight[0]*xraydb.incoherent_cross_section_elam(atom_type[0], energy_kev*1000)
+        mu +=  occ[i]*weight[i]*xraydb.mu_elam(atom_type[i], energies_kev*1000)#photoabsorption_crosssection(elements, energy_kev)
+        #mu +=  occ[0]*weight[0]*xraydb.incoherent_cross_section_elam(atom_type[0], energies_kev*1000)
     #st.write(vol)
     absorption = vol/mu
     return absorption*10**4 # cm to µm
 
 def get_att_plot(xtl, energy_kev, sample_thickness):
+    '''
+    makes a plot of the attenuation length
+        input:
+            xtl, Dans_Diffraction.Crystal() object
+            energy_kev, float, energy in keV
+            sample_thickness, float, thickness of the sample in µm
+        return:
+            matplotlib figure
+    '''
     fig, axes = plt.subplots(1,2,figsize=(12,4), dpi=100)
 
     energies = np.arange(1,30,0.1)
-    attenuation_um2 = att_length(xtl, energies) # the *10 == bug in dan's diffraction?
+    attenuation_um2 = att_length(xtl, energies)
 
     axes[0].loglog(energies, attenuation_um2, color = [0.8,0.2,0])
     axes[0].set_xlabel('energy [keV]')
@@ -59,9 +76,9 @@ def get_att_plot(xtl, energy_kev, sample_thickness):
 ########################## crystal rotation functions #####################
 def rotate(x,z,phi):# 2D rotation function
     '''
-    generic rotation funciton for generating the crystal rotation function
+    generic rotation function for generating the crystal rotation functions
     '''
-    return x*np.cos(phi)-z*np.sin(phi),z*np.cos(phi)+x*np.sin(phi)
+    return x*np.cos(phi)-z*np.sin(phi), z*np.cos(phi)+x*np.sin(phi)
 def rotate_x(loc,phi):#rotate_x: rotates around x axis (horisontal)
     '''
     in-place rotation around x axis for generating the crystal rotation function

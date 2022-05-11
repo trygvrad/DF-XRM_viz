@@ -7,7 +7,6 @@ import os.path
 import requests
 import Dans_Diffraction
 import pandas as pd
-
 import plotly.io as pio
 from PIL import Image
 
@@ -326,7 +325,7 @@ if uploaded_file is not None or crystal != 'Upload':
     #######################################################################
     scale = 1.0
     extend_beam = [25000.0,25000.0]
-    extend_imaging_system = (5000.0,7500.0)
+    extend_scattered_beam = 7500.0
     legend_pos_shift = [2,0,-4]
     crystal_scale = 600.0
     crystal_axes_shift = [-5,-3,-5]
@@ -348,7 +347,7 @@ if uploaded_file is not None or crystal != 'Upload':
             return np.array([float(v) for v in s.split(',')])
         scale = st.sidebar.number_input('Sample scale',0.00001,1000000.0,scale) #min, max, default
         extend_beam = parse_vec('Extend beam front/back µm', str(extend_beam).strip('[]'))*scale
-        extend_imaging_system = np.array([5000,st.sidebar.number_input('sample-lens distance µm',0.00001,1000000.0,extend_imaging_system[1])])*scale
+        extend_scattered_beam = st.sidebar.number_input('sample-lens distance µm',0.00001,1000000.0,extend_scattered_beam)*scale
         lens_scale = st.sidebar.number_input('lens scale (scaled to sample)',0.00001,1000000.0,lens_scale) #min, max, default
 
         params['transverse_width'] = st.sidebar.number_input('beam width, µm',0.00001,1000000.0,params['transverse_width']) #min, max, default
@@ -390,9 +389,7 @@ if uploaded_file is not None or crystal != 'Upload':
                 atom_list = make_crystal_structure(),
                 crysta_structure_position = crysta_structure_position,
                 extend_beam = extend_beam,
-                beam_opacity= 1.0,
-                extend_imaging_system = extend_imaging_system,
-                imaging_system_lw = 0,
+                extend_scattered_beam = extend_scattered_beam,
                 lens_scale = lens_scale*0.2,
                 bounding_box_facecolor = [0,0,0,0.3],
                 draw_stage = True,
@@ -480,11 +477,6 @@ if uploaded_file is not None or crystal != 'Upload':
 
     st.markdown(get_binary_file_downloader_html('DF_XRM_vis_to_blender.pickled', 'pickled 3d structure for blender'), unsafe_allow_html=True)
     st.markdown(get_binary_file_downloader_html('blender_import_script.py', 'blender import script'), unsafe_allow_html=True)
-
-    #######################################################################
-    ######################## export blender script ########################
-    #######################################################################
-    #if 1:
 
 
 st.write("This is version 1.0.0. Souce code available at https://github.com/trygvrad/DF-XRM_viz under MIT lisence.")
