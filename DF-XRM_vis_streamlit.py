@@ -1,33 +1,32 @@
 import streamlit as st
 import numpy as np
 import fpdf
-import plotly
-import sys, os
-import os.path
+import os
 import requests
 import Dans_Diffraction
 import pandas as pd
+import PIL.Image
 import plotly.io as pio
-from PIL import Image
-
 import helpers
 import draw_crystal_structures
 import three_d_draw
-import three_d_draw_object_classes
 import base64
+
 def get_binary_file_downloader_html(bin_file, file_label='File'):
+    '''
+    provides a link to a file that can be downloaded
+    input:
+        bin_file: path to file to be downloaded
+        file_label: string, text for link
+    return:
+        string, html with link
+    '''
     with open(bin_file, 'rb') as f:
         data = f.read()
     bin_str = base64.b64encode(data).decode()
     href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
     return href
 
-import importlib
-
-importlib.reload(sys.modules['three_d_draw_object_classes'])
-importlib.reload(sys.modules['three_d_draw'])
-
-# Yes. Change it to reportview-container - > appview-container
 st.markdown(
         f"""
 <style>
@@ -127,8 +126,6 @@ if uploaded_file is not None or crystal != 'Upload':
 
     xtl = Dans_Diffraction.Crystal(cif_file)
     xtl.generate_lattice()
-    wavelength_in_um = float(params['wavelength_in_um'])
-    wavelength = wavelength_in_um*10**-6 # in meters
     xtl.Scatter.setup_scatter(type='xray', energy_kev=energy_kev)
 
     #######################################################################
@@ -276,11 +273,11 @@ if uploaded_file is not None or crystal != 'Upload':
 
         in most cases the "Beam exit direction" will be the same as the "Sample exit surface"
         '''
-    lmbd = float(params['wavelength_in_um'])
-    k_abs = 2*np.pi/lmbd
+    k_abs = 2*np.pi/params['wavelength_in_um']
     Q = np.linalg.norm(params['Q_vector'])
     st.sidebar.markdown('Beam-crystal geometry')
     is_beam_norm = st.sidebar.checkbox("minimize distance beam travels through sample", True)
+    beam_exit_hkl_str = ''
     if not is_beam_norm:
         beam_exit_hkl_str = st.sidebar.text_input('Beam exit direction ~(h,k,l) or ~[u,v,w,]', '') #min, max, default
         st.sidebar.write("For the 'Beam exit direction', only the component orthogonal to Q is perserved")
@@ -339,7 +336,13 @@ if uploaded_file is not None or crystal != 'Upload':
     lens_scale = 1.0
     params['transverse_width'] = 100.0
     params['beam_thickness'] = 10.0
+    magnification = 3.0
 
+    show_lens = st.sidebar.checkbox("Show DFXRM lens")
+    if (show_lens==False):
+        lens_scale  = 0.0
+        extend_scattered_beam *= 3
+        
     vo = st.sidebar.checkbox("Visualization options")
     if vo:
         def parse_vec(description, default_string):
@@ -348,7 +351,8 @@ if uploaded_file is not None or crystal != 'Upload':
         scale = st.sidebar.number_input('Sample scale',0.00001,1000000.0,scale) #min, max, default
         extend_beam = parse_vec('Extend beam front/back µm', str(extend_beam).strip('[]'))*scale
         extend_scattered_beam = st.sidebar.number_input('sample-lens distance µm',0.00001,1000000.0,extend_scattered_beam)*scale
-        lens_scale = st.sidebar.number_input('lens scale (scaled to sample)',0.00001,1000000.0,lens_scale) #min, max, default
+        if (show_lens>0):
+            lens_scale = st.sidebar.number_input('lens scale (scaled to sample)',0.00001,1000000.0,lens_scale) #min, max, default
 
         params['transverse_width'] = st.sidebar.number_input('beam width, µm',0.00001,1000000.0,params['transverse_width']) #min, max, default
         params['beam_thickness'] = st.sidebar.number_input('beam thickness, µm',0.00001,1000000.0,params['beam_thickness']) #min, max, default
@@ -357,6 +361,7 @@ if uploaded_file is not None or crystal != 'Upload':
         legend_pos_shift = parse_vec('crystal legend position', str(legend_pos_shift).strip('[]'))
         crystal_axes_shift = parse_vec('crystal axes position', str(crystal_axes_shift).strip('[]'))
         cage_list = st.sidebar.text_input('oxygen cages around', ', '.join(cage_list)).split(',')
+        cage_list = [c.strip() for c in cage_list]
         oxygen_cage_radius = st.sidebar.number_input('oxygen cage radius',0.00001,1000000.0,oxygen_cage_radius) #min, max, default
         make_bonds = st.sidebar.text_input('make bonds from/to', ', '.join(make_bonds)).split(',')
         make_bonds = [b.strip() for b in make_bonds]
@@ -364,29 +369,28 @@ if uploaded_file is not None or crystal != 'Upload':
         min_bond_length = bond_length[0]
         max_bond_length = bond_length[1]
         show_text = st.sidebar.checkbox("show text", show_text)
+        magnification = st.sidebar.number_input('magnification from lens',1.0,1000.0,magnification)
 
-    def make_crystal_structure():
-        Q = crystal_rotation_function(xtl.Cell.calculateQ(params['hkl'])[0])
-        return draw_crystal_structures.add_crystal_structure( cif_file, scale = crystal_scale,
-                    rotation_function = crystal_rotation_function,
-                    legend_pos_shift = legend_pos_shift,
-                    axes_shift = crystal_axes_shift,
-                    max_bond_length = max_bond_length, min_bond_length = min_bond_length,
-                    linewidth = 3,
-                    bounding_box_facecolor = [0.5,0.6,0.7,0],
-                    cage_line_color = [0.8,0.8,0.8,1],
-                    linecolor = [0.5,0.5,0.5,1],
-                    show_text = show_text,
-                    cage_list = cage_list,
-                    make_bonds = make_bonds,
-                    #atom_legend_step = Q/np.sqrt(np.sum(Q**2)),
-                    )
+    crystal_structure = draw_crystal_structures.add_crystal_structure( cif_file, scale = crystal_scale,
+                rotation_function = crystal_rotation_function,
+                legend_pos_shift = legend_pos_shift,
+                axes_shift = crystal_axes_shift,
+                max_bond_length = max_bond_length, min_bond_length = min_bond_length,
+                linewidth = 3,
+                bounding_box_facecolor = [0.5,0.6,0.7,0],
+                cage_line_color = [0.8,0.8,0.8,1],
+                linecolor = [0.5,0.5,0.5,1],
+                show_text = show_text,
+                cage_list = cage_list,
+                make_bonds = make_bonds,
+                #atom_legend_step = Q/np.sqrt(np.sum(Q**2)),
+                )
 
     drawing, fig, ax, outstr = three_d_draw.make_3d_perspective(params,
                 export_blender_filepath = 'DF_XRM_vis_to_blender.pickled',
                 crystal_rotation_function = crystal_rotation_function,
                 scale = scale,
-                atom_list = make_crystal_structure(),
+                atom_list = crystal_structure,
                 crysta_structure_position = crysta_structure_position,
                 extend_beam = extend_beam,
                 extend_scattered_beam = extend_scattered_beam,
@@ -396,6 +400,7 @@ if uploaded_file is not None or crystal != 'Upload':
                 draw_axes = True,
                 draw_scattering_arrows = True,
                 show_text = show_text,
+                magnification = magnification,
                 )
 
     for i in range(len(outstr)):
@@ -454,7 +459,7 @@ if uploaded_file is not None or crystal != 'Upload':
         pdf.image('2dfig.png', w=200)
 
         test_image = "3dfig.png"
-        original = Image.open(test_image)
+        original = PIL.Image.open(test_image)
         width, height = original.size   # Get dimensions
         left = width/6
         top = height/4

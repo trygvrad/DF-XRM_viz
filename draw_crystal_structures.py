@@ -74,8 +74,10 @@ def add_crystal_structure( cif_file, scale = 4.0, rotation_function = None, lege
     ############## add bonds ##############
     for i, typ in enumerate(atom_types):
         if typ == make_bonds[0]:
-            for j, typ2 in enumerate(atom_types[i+1:]):
-                j = j+i+1
+            for j, typ2 in enumerate(atom_types):
+                if i == j:
+                    continue
+                #j = j+i+1
                 if typ2 == make_bonds[1]:
                     loc0 = loc_in_AA[i]
                     loc1 = loc_in_AA[j]

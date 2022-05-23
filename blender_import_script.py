@@ -1,4 +1,12 @@
-
+'''
+This script allows the import of the 3d plotly visualization from DF-XRM-vis to blender
+the DF_XRM_vis_to_blender.pickled contains a list of list of dictionaries
+each dictionary describes a quadilateral, mesh or line
+Usage:
+    Place this script in the same folder as the "DF_XRM_vis_to_blender.pickled" file
+    Import this script to blender
+    Run this script *once*
+'''
 import bpy
 import pickle
 import math
@@ -7,6 +15,9 @@ import numpy as np
 import inspect, os
 
 def dir_of_this():
+    '''
+    returns the file path to this script
+    '''
     raw_path = inspect.getfile(inspect.currentframe())
     l = len(bpy.data.filepath)
     if raw_path[:l] == bpy.data.filepath:
@@ -21,6 +32,14 @@ def dir_of_this():
 path = str(dir_of_this())+"/DF_XRM_vis_to_blender.pickled"
 
 def create_quadrilateral(nodes, name):
+    '''
+    creates a quadilateral facet spanning the nodes in nodes
+    input:
+        nodes: numpy array of shape [4,3]
+        name: string
+    return:
+        bpy.data.object, bpy.data.mesh
+    '''
     myvertex = []
     myfaces = []
     mypoint = [tuple(nodes[0])]
@@ -48,6 +67,15 @@ def create_quadrilateral(nodes, name):
     return myobject, mymesh
 
 def make_line(nodes, name, r=0.1):
+    '''
+    line connecting the nodes in nodes
+    input:
+        nodes: numpy array of shape [2,3]
+        name: string
+        r: float, radius of the line, default 0.1
+    return:
+        bpy.data.object
+    '''
     d10 = nodes[1]-nodes[0]
     dist = np.sqrt(np.sum(d10**2))
 
@@ -56,8 +84,6 @@ def make_line(nodes, name, r=0.1):
         depth = dist,
         location = np.average(nodes,axis=0)
         )
-
-
     phi = math.atan2(d10[1], d10[0])
     theta = math.acos(d10[2]/dist)
     myobject = bpy.context.object
@@ -69,6 +95,14 @@ def make_line(nodes, name, r=0.1):
 
 
 def set_mat_keys(mat,color):
+    '''
+    sets material properties of material mat
+    input:
+        mat: blender material object
+        color: color [r,g,b,a]
+    return:
+        None
+    '''
     nodes = mat.node_tree.nodes
     links = mat.node_tree.links
     node_output  = nodes.new(type='ShaderNodeOutputMaterial')
@@ -89,11 +123,12 @@ def set_mat_keys(mat,color):
     mat.node_tree.nodes["Principled BSDF"].inputs['Transmission'].default_value = 0.5
 
 
+############## read pickle
 objects = pickle.load( open( path, "rb" ) )
-
+############## make a new collection
 collection = bpy.data.collections.new("new_collection")
-bpy.context.scene.collection.children.link(collection)                # Link object to scene
-
+bpy.context.scene.collection.children.link(collection)  # Link collection to scene
+############## import objects in pickle to scene
 for i, object in enumerate(objects):
     if object['type']=='Mesh':
 
@@ -113,7 +148,6 @@ for i, object in enumerate(objects):
         links = mat.node_tree.links
         ob.active_material = mat
         set_mat_keys(mat,object['facecolor'])
-
 
         mesh.from_pydata(list(object['nodes']*10**-3),[],list(object['faces']))   # edges or faces should be [], or you ask for problems
         mesh.update(calc_edges=True)    # Update mesh with new data

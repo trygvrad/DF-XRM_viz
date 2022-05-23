@@ -3,7 +3,6 @@ streamlit==0.83.0
 matplotlib==3.4.2
 pandas==1.2.4
 Dans-Diffraction==1.9.2
-xraydb==4.4.7
 plotly==5.1.0
 kaleido==0.2.1
 fpdf==1.7.2

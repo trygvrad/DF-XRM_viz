@@ -25,6 +25,7 @@ def make_3d_perspective(params, export_blender_filepath=None,
                 # misc
                 arrow_nodes_per_circle=12,
                 show_text = True,
+                magnification = 3,
                 ):
     '''
     Makes a plotly figure illustrating the experiment
@@ -211,7 +212,7 @@ def make_3d_perspective(params, export_blender_filepath=None,
     kh = apply_rotation(np.copy(params['kh_vector']), phi, chi, omega, beam_stage_angle)
     make_beam_and_lens(drawing, sample_node_collection.node_locations, kh, params['shape'],
             scale, extend_beam, params['beam_thickness'], params['transverse_width'],
-            extend_scattered_beam, lens_scale)
+            extend_scattered_beam, lens_scale, magnification)
 
     # translate arrows
     if draw_scattering_arrows:
@@ -546,8 +547,8 @@ def concave_surface(radius,num_links,r_curvature, facing, invert = False):
                 dir[0:2] = np.matmul(rot_mat,dir[0:2])
                 n+=1
     '''
-    at this point, nodes is a 5d array [ring_index, node_index_in_ring, x, y, z]
-    the nodes will be repoisitioned and reshaped into nodes2, a 4d array [node_index, x, y, z]
+    at this point, nodes is a 3d array [ring_index, node_index_in_ring, xyz]
+    the nodes will be repoisitioned and reshaped into nodes2, a 2d array [node_index, xyz]
     '''
     # crop disk to square and make concave
     nodes2 = []
@@ -867,7 +868,7 @@ def apply_rotation(vec, phi, chi, omega, beam_stage_angle):
     return vec
 
 
-def make_beam_and_lens(drawing, sample_nodes, kh, shape, scale, extend_beam, beam_thickness, transverse_width, extend_scattered_beam, lens_scale):
+def make_beam_and_lens(drawing, sample_nodes, kh, shape, scale, extend_beam, beam_thickness, transverse_width, extend_scattered_beam, lens_scale, magnification):
     '''
     adds the beam and lens to the drawing
     should be considered as part of make_3d_perspective() but separated out as an independent function to make make_3d_perspective() slightly easier to follow.
@@ -926,10 +927,9 @@ def make_beam_and_lens(drawing, sample_nodes, kh, shape, scale, extend_beam, bea
                 facing = -kh, displacement = lens_center + delta_lens*i)
     # beam behind lens
     if lens_scale>0:
-        magnification = 3
         node_locs = np.zeros((8,3))
         node_locs[:4] = sample_in_lens
-        node_locs[4:] = sample_in_lens*3+lens_center
+        node_locs[4:] = sample_in_lens*magnification+lens_center
         # make object
         box_node_collection = object_classes.NodeCollection(node_locs)
         drawing.nodes.append(box_node_collection)
