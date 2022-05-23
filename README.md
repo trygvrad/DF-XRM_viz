@@ -12,16 +12,14 @@ or run the jupyter example in a jupyter notebook.
 Sample absorption
 ---------------------------
 
-Uploading a `.cif` file to `DF-XRM_vis` (Fig. [1](#fig:1){reference-type="ref" reference="fig:1"}a) `DF-XRM_vis` will plot the attenuation length with respect to the energy (Fig. [1](#fig:1){reference-type="ref" reference="fig:1"}d), and plot the transmission with respect to the sample thickness (Fig. [1](#fig:1){reference-type="ref" reference="fig:1"}e).
+Uploading a `.cif` file to `DF-XRM_vis` (Fig. 1a) `DF-XRM_vis` will plot the attenuation length with respect to the energy (Fig. 1d), and plot the transmission with respect to the sample thickness (Fig. 1e).
 
 A handful of crystal-structures are available from the dropdown menu for easy access (as shown in the example).
 
-![Attenuation and transmission in `DF-XRM_vis`. **a** Upload or selection of `.cif` file. **b** selection of X-ray energy. **c** selection of sample thickness. **d** plot of energy versus attenuation. **e** plot of thickness versus transmission.\label{fig:1}](df-xrm_1.png){ width=800 }
+<img src="figures/df-xrm_1.png" width=50%>
 
-
-
-The selected X-ray energy can then be changed (Fig. [1](#fig:1){reference-type="ref" reference="fig:1"}b, in keV or Å), and
-the thickness of the sample can be changed (Fig. [1](#fig:1){reference-type="ref" reference="fig:1"}c).
+The selected X-ray energy can then be changed (Fig. 1b, in keV or Å), and
+the thickness of the sample can be changed (Fig. 1c).
 
 This gives an immediate assessment of the flux exiting the sample, thus determins the viability of utilizing the sample for DF-XRM.
 
@@ -30,7 +28,7 @@ Considering Q-vectors
 
 Based on the provided `.cif` file and chosen wavelength, `DF-XRM_vis` will provide a table of available reflections, their scattering angle and *d*-spacing.
 
-![Example the table produced after a `.cif` file is chosen. The example describes KNbO$_3$ at 17 keV.\label{fig:2}](df-xrm_2.png){width=800}
+<img src="figures/df-xrm_2.png" width=50%>
 
 A suitable reflection, as allowed by the instrument, can then be chosen. `DF-XRM_vis` will automatically select the brightest reflection as an initial guess.
 
@@ -49,8 +47,8 @@ The rendering shows the required alignment of the crystal at to fulfill the sele
 
 4. The goiniometer stage, annotated with the angles of rotation.
 
-
-![Example visualization showing an x-cut LiNbO$_3$ wafer, aligned on the (1,-1,2) (brightest) reflection.\label{fig:3}](df-xrm_3.png){width=800}
+<img src="figures/df-xrm_3.png" width=50%>
+Example visualization showing an x-cut LiNbO$_3$ wafer, aligned on the (1,-1,2) (brightest) reflection.
 
 Rendering the sample with realistic dimensions makes it easier to ensure that samples are positioned with the intended orientation during the experiment, and helps visualize past experiments. 
 
