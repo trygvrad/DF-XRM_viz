@@ -127,7 +127,7 @@ if uploaded_file is not None or crystal != 'Upload':
 
     xtl = Dans_Diffraction.Crystal(cif_file)
     xtl.generate_lattice()
-    xtl.Scatter.setup_scatter(type='xray', energy_kev=energy_kev)
+    xtl.Scatter.setup_scatter(scattering_type='xray', energy_kev=energy_kev)
 
     #######################################################################
     ###################### show material properties #######################
@@ -411,7 +411,7 @@ if uploaded_file is not None or crystal != 'Upload':
     #######################################################################
     ####################### show optics geometry ##########################
     #######################################################################
-
+    has_lens_fig = False
     known_lens_configuration = [
         '-',
         'id06 Be',
@@ -426,6 +426,7 @@ if uploaded_file is not None or crystal != 'Upload':
         d_tot = mainx/np.cos(np.radians(two_theta))
         fig_optics, ax = optics_geometry.make_optics_geometry_plot(energy_kev, two_theta, d_tot)
         st.write(fig_optics)
+        has_lens_fig = True
     #######################################################################
     ########################### print to pdf ##############################
     #######################################################################
@@ -495,6 +496,14 @@ if uploaded_file is not None or crystal != 'Upload':
         tab = str(df)
         tab = tab.replace('𝜃','theta').encode('latin-1', 'ignore').decode('latin-1')
         pdf.multi_cell(0, 4, tab, 0, 1,'L', False)
+        if has_lens_fig:
+            pdf.add_page()
+            txt = lens.encode('latin-1',  'ignore').decode('latin-1')
+            pdf.set_xy(20, 20)
+            pdf.multi_cell(0, 4, txt, 0, 1,'L', False)
+            fig_optics.savefig("fig_optics.png")
+            pdf.image('fig_optics.png', w=200)
+
         pdf.output('DF-XRM_vis.pdf')
 
         st.markdown(get_binary_file_downloader_html('DF-XRM_vis.pdf', 'pdf'), unsafe_allow_html=True)
@@ -503,5 +512,5 @@ if uploaded_file is not None or crystal != 'Upload':
     st.markdown(get_binary_file_downloader_html('blender_import_script.py', 'blender import script'), unsafe_allow_html=True)
 
 
-st.write("This is version 1.0.0. Souce code available at https://github.com/trygvrad/DF-XRM_viz under MIT lisence.")
+st.write("This is version 2.0.0. Souce code available at https://github.com/trygvrad/DF-XRM_viz under MIT lisence.")
 st.write("please report bugs to tmara@dtu.dk, or contribute directly at github.")
