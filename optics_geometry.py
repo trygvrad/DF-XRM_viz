@@ -4,6 +4,8 @@ import numpy as np
 import Dans_Diffraction
 import os
 import scipy.optimize
+import requests
+
 def make_optics_geometry_plot(energy_kev, two_theta, d_tot):
     d0, dL, dn, M =  get_id06_be_lens_params(energy_kev, two_theta, d_tot)
     dtot = d0+dL+dn
