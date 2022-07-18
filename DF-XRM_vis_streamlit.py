@@ -11,6 +11,7 @@ import helpers
 import draw_crystal_structures
 import three_d_draw
 import base64
+import optics_geometry
 
 def get_binary_file_downloader_html(bin_file, file_label='File'):
     '''
@@ -314,8 +315,8 @@ if uploaded_file is not None or crystal != 'Upload':
     x = np.sqrt(  ( k_abs**2 - 0.25*Q**2 ) / ( k_ort_l**2) )
     params['k0_vector'] = -0.5*params['Q_vector'] + x*k_dir_orthogonal_to_Q
     params['kh_vector'] = 0.5*params['Q_vector'] + x*k_dir_orthogonal_to_Q
-    twotheta = 2*np.arcsin(np.sqrt(np.sum(params['Q_vector']**2))*params['wavelength_in_um']/4/np.pi)*180/np.pi
-    st.write(f'Instrument alignment on [{"".join(hkl_spli)}]:  \n 2𝜃 = {twotheta:.3f}')
+    two_theta = 2*np.arcsin(np.sqrt(np.sum(params['Q_vector']**2))*params['wavelength_in_um']/4/np.pi)*180/np.pi
+    st.write(f'Instrument alignment on [{"".join(hkl_spli)}]:  \n 2𝜃 = {two_theta:.3f}')
 
     #######################################################################
     ###################### make 3d visualization ##########################
@@ -342,7 +343,7 @@ if uploaded_file is not None or crystal != 'Upload':
     if (show_lens==False):
         lens_scale  = 0.0
         extend_scattered_beam *= 3
-        
+
     vo = st.sidebar.checkbox("Visualization options")
     if vo:
         def parse_vec(description, default_string):
@@ -408,6 +409,24 @@ if uploaded_file is not None or crystal != 'Upload':
 
     st.plotly_chart(fig)
     #######################################################################
+    ####################### show optics geometry ##########################
+    #######################################################################
+
+    known_lens_configuration = [
+        '-',
+        'id06 Be',
+    ]
+
+    lens = st.selectbox('Lensbox:',
+            known_lens_configuration)
+    if lens == 'id06 Be':
+        mainx = st.number_input("'mainx' [mm]:     (mainx = d₁'+dL'+d₂')",0.0,100000.0,5000.0) #min, max, default
+        #energy_kev = 17
+        #two_theta = 15
+        d_tot = mainx/np.cos(np.radians(two_theta))
+        fig_optics, ax = optics_geometry.make_optics_geometry_plot(energy_kev, two_theta, d_tot)
+        st.write(fig_optics)
+    #######################################################################
     ########################### print to pdf ##############################
     #######################################################################
 
@@ -427,7 +446,7 @@ if uploaded_file is not None or crystal != 'Upload':
         txt.append(cell_par[0])
         txt.append('A = ' +cell_par[1])
         txt.append(f'Q vector hkl {hkl_str}')
-        txt.append(f'2theta = {twotheta:.3f}')
+        txt.append(f'2theta = {two_theta:.3f}')
 
         if not up_hkl_str == '':
             txt.append(f"Sample 'up' hkl {up_hkl_str}")

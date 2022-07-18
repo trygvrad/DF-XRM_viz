@@ -19,7 +19,7 @@ The highlight of the toolkit is generating three dimensional models of experimen
 Advances in X-ray brilliance and optics has recently led to the development of Bragg scanning probe X-ray microscopy, Bragg coherent diffraction imaging, Bragg X-ray ptychography and dark-field X-ray microscopy. 
 All the aforementioned techniques fundamentally capture the same crystallographic information, and have different advantages and disadvantages.
 As all the aforementioned techniques are built upom Bragg diffraction, they all require the instrument to be aligned so that Braggs law is fulfilled. 
-Failure to apprehend or communicate the constraints has been a liability in the practical application of DF-XRM.
+Failure to apprehend or communicate the constraints has been shown to be a liability for practical application.
 `DF-XRM_vis` is designed to be an aid in assessing the geometrical constraints that determine Bragg diffraction. `DF-XRM_vis` may also aid in data analysis, serve as a
 teaching tool, or an aid when discussing the practical implications of advanced X-ray techniqes more broadly.
 

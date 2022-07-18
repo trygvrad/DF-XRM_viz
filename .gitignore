@@ -3,3 +3,6 @@ DF-XRM_vis.pdf
 *fig*.png
 __pycache__/*
 *.pickled
+.ipy*
+*.cif
+
