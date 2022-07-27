@@ -39,7 +39,7 @@ def get_att_plot(xtl, energy_kev, sample_thickness):
     '''
     fig, axes = plt.subplots(1,2,figsize=(12,4), dpi=100)
 
-    energies = np.arange(1,30,0.1)
+    energies = np.arange(1,60,0.1)
     attenuation_um2 = att_length(xtl, energies)
 
     axes[0].loglog(energies, attenuation_um2, color = [0.8,0.2,0])
