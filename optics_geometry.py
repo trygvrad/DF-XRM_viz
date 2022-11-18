@@ -6,8 +6,26 @@ import os
 import scipy.optimize
 import requests
 
-def make_optics_geometry_plot(energy_kev, two_theta, d_tot):
-    d0, dL, dn, M =  get_id06_be_lens_params(energy_kev, two_theta, d_tot)
+def make_optics_geometry_plot(energy_kev, two_theta, d_tot, parsed_lens_file):
+    '''
+    Calculates the lens position from the config and annotates the figure 'd1_d2_fig.png' with the relevant parameters
+    Paramets in the parsed_lens_file are deleted as used
+    input:
+        energy_kev: float
+        two_theta: float in degrees
+        d_tot: distance from sample to detector
+        parsed_lens_file: loaded lens(toml) file (i.e. dictionary of dictionaries)
+    return:
+        fig: matplotlib.figure
+        ax: axes in figure
+    '''
+    # get relevant parameters, and remove used parameters from the parsed_lens_file
+    focal_lengths, interlens_distances = align_optics_from_config(parsed_lens_file, energy_kev)
+    f_tl = 1/np.sum(1/np.array(focal_lengths)) # approximation of thin-lens focal distance
+    d0, dn = get_d1_d2_from_tot_d(focal_lengths, interlens_distances, d_tot, f_tl)
+    M = get_magnification(focal_lengths,[d0]+list(interlens_distances)+[dn])
+    #
+    dL = np.sum(interlens_distances)
     dtot = d0+dL+dn
 
     d0p = d0*np.cos(np.pi*two_theta/180)
@@ -15,6 +33,7 @@ def make_optics_geometry_plot(energy_kev, two_theta, d_tot):
     dnp = dn*np.cos(np.pi*two_theta/180)
     dtotp = d0p+dLp+dnp
 
+    # make figure
     fig = plt.figure(figsize = (5,3), dpi = 300)
     ax = fig.add_axes([0, 0, 1, 1])
     d1_d2_fig = imageio.imread('d1_d2_fig.png')
@@ -39,7 +58,107 @@ def make_optics_geometry_plot(energy_kev, two_theta, d_tot):
     ax.text(870, 775, r"$d_{tot}'$"+f" = {dtotp:.2f} mm", ha = 'center', va = 'center')
 
     ax.text(1380, 150, f"$M$ = {M:.2f}", rotation = -60, ha = 'center', va = 'center')
+
+    # setup lens mount point, removing elements from the config continiously
+    lens_mount_point = np.array([d0p, np.sqrt(d0**2-d0p**2)])
+    if 'mount_point' in parsed_lens_file:
+        mp = parsed_lens_file['mount_point']
+        if 'offset_along_lensbox' in mp:
+            lens_mount_point += mp['offset_along_lensbox']*np.array([np.cos(two_theta*np.pi/180), np.sin(two_theta*np.pi/180)])
+            del mp['offset_along_lensbox']
+        if 'offset_orthogonal_to_lensbox' in mp:
+            lens_mount_point += mp['offset_orthogonal_to_lensbox']*np.array([-np.sin(two_theta*np.pi/180), np.cos(two_theta*np.pi/180)])
+            del mp['offset_orthogonal_to_lensbox']
+        if 'offset_x' in mp:
+            lens_mount_point[0] += mp['offset_x']
+            del mp['offset_x']
+        if 'offset_y' in mp:
+            lens_mount_point[1] += mp['offset_y']
+            del mp['offset_y']
+
+        if len(mp) == 0:
+            del parsed_lens_file['mount_point']
+    # print mount point
+    mount_point_string = ''
+    if 'print_mount_point' in parsed_lens_file:
+        pmp = parsed_lens_file['print_mount_point']
+        if 'print_distance_along' in pmp:
+            if pmp['print_distance_along']:
+                x = lens_mount_point[0] * np.cos(two_theta*np.pi/180) + lens_mount_point[1] * np.sin(two_theta*np.pi/180)
+                mount_point_string += f'{x:.2f} mm along beam\n'
+            del pmp['print_distance_along']
+        if 'print_distance_orthogonal' in pmp:
+            if pmp['print_distance_orthogonal']:
+                x = -lens_mount_point[0] * np.sin(two_theta*np.pi/180) + lens_mount_point[1] * np.cos(two_theta*np.pi/180)
+                mount_point_string += f'{x:.2f} mm orthogonal to beam\n'
+            del pmp['print_distance_orthogonal']
+        if 'print_distance_x' in pmp:
+            if pmp['print_distance_x']:
+                x = lens_mount_point[0]
+                mount_point_string += f'x = {x:.2f} mm\n'
+            del pmp['print_distance_x']
+        if 'print_distance_y' in pmp:
+            if pmp['print_distance_y']:
+                x = lens_mount_point[1]
+                mount_point_string += f'y = {x:.2f} mm\n'
+            del pmp['print_distance_y']
+
+        if len(pmp) == 0:
+            del parsed_lens_file['print_mount_point']
+    if len(mount_point_string)>0:
+        ax.text(25, 50, 'Lens mount point:\n'+mount_point_string, ha = 'left', va = 'top')
+
     return fig, ax
+
+def align_optics_from_config(parsed_lens_file, energy_kev):
+    '''
+    Gets the focal lenght of each lenselet and the distances between lenslets from the lens(toml) file.
+    Settings in the parsed_lens_file are deleted as used (in place)
+    input:
+        parsed_lens_file: loaded lens(toml) file (i.e. dictionary of dictionaries)
+        energy_kev: float
+    return:
+        focal_lengths: list of length equal to the number of lenslets containing their focal length
+        interlens_distances: list of distances between lenselents, the length is len(focal_lengths)-1
+    '''
+    focal_lengths = [] # <- focal lengths of lenses
+    distances = [] # <- lens position from start of lensbox
+    distance_so_far_in_mm = 0
+    for i in range(100):
+        # check if we have a lens series
+        series_name = f'lens_series_{i}'
+        if series_name in parsed_lens_file:
+            lens_series = parsed_lens_file[series_name]
+            n_comlex = Dans_Diffraction.fc.xray_refractive_index(\
+                                     lens_series['material']['atoms_in_Unit_cell'],
+                                     energy_kev,
+                                     1.0/lens_series['material']["unit_cell_volume_in_AA3"])[0]
+            R = lens_series['radius_of_curvature_in_µm']/1000 # x µm curvature
+            n = n_comlex.real
+            δ = 1-n
+            f = R/(2*δ)
+            for _ in range(lens_series['number_of_lenses']):
+                focal_lengths.append(f)
+                distances.append(distance_so_far_in_mm)
+                distance_so_far_in_mm += lens_series['lens_spacing_in_mm']
+            distance_so_far_in_mm -= lens_series['lens_spacing_in_mm'] # remove last shift
+            del lens_series['radius_of_curvature_in_µm'], lens_series['number_of_lenses'], lens_series['lens_spacing_in_mm']
+            del lens_series['material']['atoms_in_Unit_cell'], lens_series['material']['unit_cell_volume_in_AA3']
+            if len(lens_series['material']) == 0:
+                del lens_series['material']
+            if len(lens_series) == 0:
+                del parsed_lens_file[series_name]
+        # check if we have a separator
+        separator_name = f'separator_{i}'
+        if separator_name in parsed_lens_file:
+            separator = parsed_lens_file[separator_name]
+            distance_so_far_in_mm += separator['spacing_in_mm']
+            del separator['spacing_in_mm']
+            if len(separator) == 0:
+                del parsed_lens_file[separator_name]
+
+    interlens_distances = np.array(distances[1:])-np.array(distances[:-1])
+    return focal_lengths, interlens_distances
 
 def get_dn(fs, ds):
     '''
@@ -85,7 +204,6 @@ def get_magnification(fs,ds):
     height += slope*ds[-1]
     return height # (heightin mm) == (height in mm)/(1 mm) == magnification
 
-
 def get_d1_d2_from_tot_d(fs, ds, d_tot, initial_guess):
     '''
     Gets both d1 and d2 (distance from sample to lens and from lens to detector) using get_dn for a fixed d_tot
@@ -96,67 +214,28 @@ def get_d1_d2_from_tot_d(fs, ds, d_tot, initial_guess):
         ds: list of floats [len(ds) == len(fs)-1], distance between each lenslet
         d_tot: float, total distance froms sample to detector
     return:
-        d1, d2 (floats, distance sample to first lenslet, distance last lenselet to detector)
+        d0, dn (floats, distance sample to first lenslet, distance last lenselet to detector)
     '''
-    ds = list(ds)
+    ds = list(ds) # ensure this is list, for easy concaetenation syntax
     dL = np.sum(ds) # total distance in lens box
 
     def fn(d0):
+        '''
+        The error function for a calculated d0
+        i.e. (dtot-(d1+dlens+d2))**2
+        '''
         return (d0 + dL + get_dn(fs, [d0]+ds) - d_tot)**2
 
-    '''xs = np.arange(0,5000)
-    y = [fn(x) for x in xs]
+    # visualize the loss curve, initial guess and final refinement (for debugging)
+    '''
     fig, ax = plt.subplots()
-    ax.plot(xs,y)
-    ax.set_ylim([-0.001,1000000])
-    #initial_guess = np.argmin(y)
-    #print(initial_guess)'''
-    return scipy.optimize.minimize(fn, initial_guess).x[0]
-
-def get_id06_be_lens_params(energy_kev, two_theta, tot_length):
+    xs = np.arange(0,d_tot//2)
+    y = [fn(x) for x in xs]
+    ax.semilogy(xs,y, color = [0,0.3,1], label = "loss")
+    ax.axvline(initial_guess, color = [0,0,0,0.5], label = "initial guess")
+    ax.axvline(scipy.optimize.minimize(fn, initial_guess).x[0], color = [1,0.3,0,0.5], label = "final")
+    ax.legend()
     '''
-    returns the sample-lens-distance, lens-thickness, and lens-detector-distance when using the Be lens at id06
-    input:
-        energy_kev, float kev
-        two_theta, float degrees
-        tot_length, float mm
-    returns:
-        (sample-lens-distance, lens-thickness, and lens-detector-distance, magnification)
-        first 3 in mm
-    '''
-    # get refractive index
-    if not os.path.exists('cif_files'):
-        os.makedirs('cif_files')
-    url = 'http://www.crystallography.net/cod/9008488.cif'
-    cif_file = 'cif_files/'+url.split('/')[-1]
-    if not os.path.isfile(cif_file):
-        r = requests.get(url)
-        open(cif_file , 'wb').write(r.content)
-
-    xtl = Dans_Diffraction.Crystal(cif_file)
-
-    atom_type = xtl.Structure.type
-    occ = xtl.Structure.occupancy
-    natoms = np.sum(occ)
-    vol = xtl.Cell.volume()
-    atom_per_volume = 1 / vol  # atoms per A^3
-    elements = ['%s%s' % (at, o) for at, o in zip(atom_type, occ)]
-
-    n_comlex = Dans_Diffraction.fc.xray_refractive_index(elements, energy_kev, atom_per_volume)[0]
-
-    # single lens prameters
-    R = 50/1000 # 50 µm curvature
-    n = n_comlex.real
-    δ = 1-n
-    f = R/(2*δ)
-
-    # lens array
-    fs = [f]*88
-    ds = [1.600]*68 +[2.000]*20
-    f_tl = R/(2*δ*88) # thin-lens focal distance
-    dL = np.sum(ds[:-1])
-    #
-    d0 = get_d1_d2_from_tot_d(fs, ds[:-1], tot_length, f_tl)
-    dn = tot_length - d0 - dL
-    M = get_magnification(fs,[d0]+ds[:-1]+[dn])
-    return d0, dL, dn, M
+    d0 = scipy.optimize.minimize(fn, initial_guess).x[0]
+    dn = d_tot-d0-dL
+    return d0, dn

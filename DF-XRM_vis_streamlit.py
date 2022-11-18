@@ -11,8 +11,9 @@ import helpers
 import draw_crystal_structures
 import three_d_draw
 import base64
+import toml
 import optics_geometry
-
+import io
 def get_binary_file_downloader_html(bin_file, file_label='File'):
     '''
     provides a link to a file that can be downloaded
@@ -411,22 +412,44 @@ if uploaded_file is not None or crystal != 'Upload':
     #######################################################################
     ####################### show optics geometry ##########################
     #######################################################################
-    has_lens_fig = False
+    # options in dropdown
     known_lens_configuration = [
-        '-',
-        'id06 Be',
+        'Upload',
+        'sample (id06@ESRF)',
     ]
+    # corresponding files
+    known_lens_files = {
+        'sample (id06@ESRF)':'id06.lens',
+    }
+    uploaded_lens_file = st.file_uploader("Upload a .lens file or select below")
+    known_lens = st.selectbox('Lensbox :', known_lens_configuration)
+    has_lens_fig = False # bool used when making .pdf
+    if uploaded_lens_file is not None or known_lens != 'Upload':
+        # get lens file contents
+        if known_lens == 'Upload':
+            lens_file_contents = uploaded_lens_file.getvalue().decode("utf-8")
+        else:
+            lens_file_path = f'lens_files/{known_lens_files[known_lens]}'
+            st.markdown(get_binary_file_downloader_html(lens_file_path, '.lens file'), unsafe_allow_html=True)
+            with open(lens_file_path) as f:
+                lens_file_contents = f.read()
 
-    lens = st.selectbox('Lensbox:',
-            known_lens_configuration)
-    if lens == 'id06 Be':
-        mainx = st.number_input("'mainx' [mm]:     (mainx = d₁'+dL'+d₂')",0.0,100000.0,5000.0) #min, max, default
-        #energy_kev = 17
-        #two_theta = 15
-        d_tot = mainx/np.cos(np.radians(two_theta))
-        fig_optics, ax = optics_geometry.make_optics_geometry_plot(energy_kev, two_theta, d_tot)
+        # get sample-detector distance
+        mainx = st.text_input("d_tot or d_tot' [mm]","d_tot' = 5000") #min, max, default
+        if "d_tot'" in mainx:
+            d_tot = float(mainx.split("=")[1])/np.cos(two_theta*np.pi/180)
+        else:
+            d_tot = float(mainx.split("=")[1])
+        # plot
+        parsed_lens_file = toml.loads(lens_file_contents)
+        fig_optics, ax = optics_geometry.make_optics_geometry_plot(\
+                        energy_kev, two_theta, d_tot, parsed_lens_file)
+        for key in parsed_lens_file.keys():
+            val = parsed_lens_file[key]
+            for param in val.keys():
+                st.write(f'"[{key}][{param}] = {val[param]}" was not used!')
         st.write(fig_optics)
-        has_lens_fig = True
+        has_lens_fig = True # bool used when making .pdf
     #######################################################################
     ########################### print to pdf ##############################
     #######################################################################
