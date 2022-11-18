@@ -9,3 +9,4 @@ xraydb==4.4.7
 imageio==2.19.5
 kaleido==0.2.1
 fpdf==1.7.2
+toml==0.10.2

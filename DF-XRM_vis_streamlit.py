@@ -13,7 +13,6 @@ import three_d_draw
 import base64
 import toml
 import optics_geometry
-import io
 def get_binary_file_downloader_html(bin_file, file_label='File'):
     '''
     provides a link to a file that can be downloaded
