@@ -1,11 +1,11 @@
 # DF-XRM_viz
-Visualization of DF-XRM, made to be hosted at https://df-xrm-vis.herokuapp.com/
+Visualization of DF-XRM, made to be hosted at https://trygvrad-df-xrm-viz-df-xrm-vis-streamlit-91mzhk.streamlit.app/
 
 You may run a standalone version by using streamlit locally by calling
 ```
 streamlit run DF-XRM_vis_streamlit.py
 ```
-or run the jupyter example in a jupyter notebook.
+or run the jupyter example.
 
 # Usage
 
@@ -16,7 +16,7 @@ Uploading a `.cif` file to `DF-XRM_vis` (Fig. 1a) `DF-XRM_vis` will plot the att
 
 A handful of crystal-structures are available from the dropdown menu for easy access (as shown in the example).
 
-<img src="figures/df-xrm_1.png" width=50%>
+<img src="assets/figures_for_readme/df-xrm_1.png" width=50%>
 
 The selected X-ray energy can then be changed (Fig. 1b, in keV or Å), and
 the thickness of the sample can be changed (Fig. 1c).
@@ -28,7 +28,7 @@ Considering Q-vectors
 
 Based on the provided `.cif` file and chosen wavelength, `DF-XRM_vis` will provide a table of available reflections, their scattering angle and *d*-spacing.
 
-<img src="figures/df-xrm_2.png" width=50%>
+<img src="assets/figures_for_readme/df-xrm_2.png" width=50%>
 
 A suitable reflection, as allowed by the instrument, can then be chosen. `DF-XRM_vis` will automatically select the brightest reflection as an initial guess.
 
@@ -47,7 +47,7 @@ The rendering shows the required alignment of the crystal at to fulfill the sele
 
 4. The goiniometer stage, annotated with the angles of rotation.
 
-<img src="figures/df-xrm_3.png" width=50%>
+<img src="assets/figures_for_readme/df-xrm_3.png" width=50%>
 Example visualization showing an x-cut LiNbO$_3$ wafer, aligned on the (1,-1,2) (brightest) reflection.
 
 Rendering the sample with realistic dimensions makes it easier to ensure that samples are positioned with the intended orientation during the experiment, and helps visualize past experiments. 
@@ -58,8 +58,6 @@ This makes it easier to compare the crystal axes to the axes of the sample.
 By showing the beam in the rendering, the intersection between the beam and sample can be understood. The detector image in DF-XRM is a projection of the intersection between the beam and sample, so that a rendering of this intersection is useful when inspecting DF-XRM images. 
 
 The goiniometer position is also shown. For large angles of $\phi$, such as shown here, it is advised to build a custom sample holder to hold the sample prior to the experiment. For smaller angles, the values presented in `DF-XRM_vis` may be directly applied to the instrument as part of the alignment procedure.
-
-
 
 
 
