@@ -7,12 +7,12 @@ import Dans_Diffraction
 import pandas as pd
 import PIL.Image
 import plotly.io as pio
-import helpers
-import draw_crystal_structures
-import three_d_draw
 import base64
 import toml
-import optics_geometry
+from libs import absorption_plots
+from libs import draw_crystal_structures
+from libs import three_d_draw
+from libs import optics_geometry
 def get_binary_file_downloader_html(bin_file, file_label='File'):
     '''
     provides a link to a file that can be downloaded
@@ -145,7 +145,7 @@ if uploaded_file is not None or crystal != 'Upload':
     #######################################################################
     ########################## attenuation plot ###########################
     #######################################################################
-    fig2d = helpers.get_att_plot(xtl, energy_kev, sample_thickness)
+    fig2d = absorption_plots.get_att_plot(xtl, energy_kev, sample_thickness)
     st.write(fig2d)
 
     #######################################################################
@@ -251,9 +251,9 @@ if uploaded_file is not None or crystal != 'Upload':
         function that describes rotation in cartesian coordinates of crystal structure or reciprocal space
         performes an in-place rotation on a numpy array of length three
         '''
-        helpers.rotate_z(hkl, z_rot_crystal*np.pi/180)# 45 degree rotation around the x-axis -> swap b and c
-        helpers.rotate_y(hkl, y_rot_crystal*np.pi/180)# 45 degree rotation around the x-axis -> swap b and c
-        helpers.rotate_x(hkl, x_rot_crystal*np.pi/180)# 45 degree rotation around the x-axis -> swap b and c
+        draw_crystal_structures.rotate_z(hkl, z_rot_crystal*np.pi/180)# 45 degree rotation around the x-axis -> swap b and c
+        draw_crystal_structures.rotate_y(hkl, y_rot_crystal*np.pi/180)# 45 degree rotation around the x-axis -> swap b and c
+        draw_crystal_structures.rotate_x(hkl, x_rot_crystal*np.pi/180)# 45 degree rotation around the x-axis -> swap b and c
         return hkl
 
     front_dir_r = crystal_rotation_function(np.copy(front_dir))
@@ -277,7 +277,7 @@ if uploaded_file is not None or crystal != 'Upload':
     k_abs = 2*np.pi/params['wavelength_in_um']
     Q = np.linalg.norm(params['Q_vector'])
     st.sidebar.markdown('Beam-crystal geometry')
-    is_beam_norm = st.sidebar.checkbox("minimize distance beam travels through sample", True)
+    is_beam_norm = st.sidebar.checkbox("Minimize distance beam travels through sample", True)
     beam_exit_hkl_str = ''
     if not is_beam_norm:
         beam_exit_hkl_str = st.sidebar.text_input('Beam exit direction ~(h,k,l) or ~[u,v,w,]', '') #min, max, default
@@ -428,7 +428,7 @@ if uploaded_file is not None or crystal != 'Upload':
         if known_lens == 'Upload':
             lens_file_contents = uploaded_lens_file.getvalue().decode("utf-8")
         else:
-            lens_file_path = f'lens_files/{known_lens_files[known_lens]}'
+            lens_file_path = f'assets/lens_files/{known_lens_files[known_lens]}'
             st.markdown(get_binary_file_downloader_html(lens_file_path, '.lens file'), unsafe_allow_html=True)
             with open(lens_file_path) as f:
                 lens_file_contents = f.read()
@@ -520,7 +520,6 @@ if uploaded_file is not None or crystal != 'Upload':
         pdf.multi_cell(0, 4, tab, 0, 1,'L', False)
         if has_lens_fig:
             pdf.add_page()
-            txt = lens.encode('latin-1',  'ignore').decode('latin-1')
             pdf.set_xy(20, 20)
             pdf.multi_cell(0, 4, txt, 0, 1,'L', False)
             fig_optics.savefig("fig_optics.png")
@@ -531,7 +530,7 @@ if uploaded_file is not None or crystal != 'Upload':
         st.markdown(get_binary_file_downloader_html('DF-XRM_vis.pdf', 'pdf'), unsafe_allow_html=True)
 
     st.markdown(get_binary_file_downloader_html('DF_XRM_vis_to_blender.pickled', 'pickled 3d structure for blender'), unsafe_allow_html=True)
-    st.markdown(get_binary_file_downloader_html('blender_import_script.py', 'blender import script'), unsafe_allow_html=True)
+    st.markdown(get_binary_file_downloader_html('assets/blender_import_script.py', 'blender import script'), unsafe_allow_html=True)
 
 
 st.write("This is version 2.0.0. Souce code available at https://github.com/trygvrad/DF-XRM_viz under MIT lisence.")
