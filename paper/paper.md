@@ -1,13 +1,15 @@
 ---
 title: Dark-field X-ray microscopy visualization
 tags:
+- python
+- material science
 - X-rays
-- Python
 - Bragg diffraction
-author:
-- 'Trygve Magnus Ræder, tmara\@dtu.dk'
-orcid: 0000-0003-3524-362X
-affiliation: "1"
+- streamlit
+authors:
+- name: Trygve Magnus Ræder
+  orcid: 0000-0003-3524-362X
+  affiliation: 1
 affiliations:
 - name: Department of Physics, Technical University of Denmark, Denmark
 index: 1
