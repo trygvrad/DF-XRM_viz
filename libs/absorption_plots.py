@@ -43,7 +43,7 @@ def get_att_plot(xtl, energy_kev, sample_thickness):
     attenuation_um2 = att_length(xtl, energies)
 
     axes[0].loglog(energies, attenuation_um2, color = [0.8,0.2,0])
-    axes[0].set_xlabel('energy [keV]')
+    axes[0].set_xlabel('Energy [keV]')
     axes[0].set_ylabel(r'Attenuation length [µm]')
     axes[0].set_xticks([1,10])
     axes[0].set_xticklabels([1,10])
