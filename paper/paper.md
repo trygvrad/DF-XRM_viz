@@ -48,7 +48,7 @@ In addition to visualizing the geometry, `DF-XRM_vis` helps evaluate feasibility
 The former is used to identify a suitable wavelength, while the latter show how thin the sample must be in order for the experiment to be feasible.
 Blue bars are added, indicating the selected wavelength and sample thickness, both of which can be tuned.
 A default value of 17 keV is provided for the X-ray energy. This energy is suitable for Be lenses, and is typically used at the DF-XRM beamline at the European Synchrotron Radiation Facility (ESRF) if the absorption peaks of the material do not dictate a different choice.
-A defult value of 150 µm is set for the thickness.
+A default value of 150 µm is set for the thickness.
 An example is shown in \autoref{fig:abs}.
 
 ![Attenuation length and transmission of a 150 µm LiNbO$_3$ sample.\label{fig:abs}](LNO_absorption.png)
@@ -62,7 +62,7 @@ The brightest reflection is automatically selected, as a bright reflection is de
 Following the table is a 3D visualization of the geometry.
 The visualization makes an initial guess that the selected scattering vector defines "up" in the sample.
 This is a reasonable assumption in many cases, but the option is provided to specify a differnt orientation using orthogonal facets.
-Facests are described using Miller indices, and both reciprocal space lattice vectors (h,k,l), or real space lattice vectors [u,v,w] are accepted.
+Facets are described using Miller indices, and both reciprocal space lattice vectors (h,k,l), or real space lattice vectors [u,v,w] are accepted.
 The visualization includes a unit cell of the material, which allows researchers to easily connect the direction in which they measure strain, and relate this to the plane defined by the incoming beam (imaging plane).
 A parallel projection is used to facilitate easy comparison of angles in the figure.
 A visualization of alignment of LiNbO$_3$ is shown in \autoref{fig:3d}.
@@ -71,8 +71,8 @@ A visualization of alignment of LiNbO$_3$ is shown in \autoref{fig:3d}.
 
 Finally, `DF-XRM_vis` may show the position of the lens.
 This feature was requested by beamline scientists at the European synchrotron radiation facility (ESRF), which uses a lensbox consisting of 88 Be lenses.
-To obtain an image in the microscope the lensbox must be positioned correctly, but simple optical considerations, approximating the lensbox as a thin lens, do not give a satifying answer. 
-`DF-XRM_vis` consideres each lens independently and uses an iterative algorithm to optimize the position of the the lensbox.
+To obtain an image in the microscope the lensbox must be positioned correctly, but simple optical considerations, approximating the lensbox as a thin lens, do not give a satisfying answer. 
+`DF-XRM_vis` considers each lens independently and uses an iterative algorithm to optimize the position of the the lensbox.
 Each lens has a focusing power that depends on the wavelength, and this is handled automatically based on the wavelength already chosen by the user. 
 The plot for positioning the lensbox is primarily intended to ease alignment of the instrument. An example is shown in \autoref{fig:lens}.
 The lensbox configuration is implemented as a `.toml` file with a custom file ending, and documentation for writing a new configuration is included in the example file for the ESRF lensbox.
