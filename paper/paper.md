@@ -96,7 +96,8 @@ DF-XRM has since been implemented at the Stanford Linear Accelerator [@holstad20
 
 # Acknowledgements
 
-`DF-XRM_vis` relies upon the python package Dans_Diffraction [@dan_porter_2020_3859501] to read `.cif` files and identify Bragg reflections. Matplotlib [@Hunter:2007] is used for 2d graphics, while plotly [@plotly] is used for 3D visualization.
-
+`DF-XRM_vis` relies upon the python package Dans_Diffraction [@dan_porter_2020_3859501] to read `.cif` files and identify Bragg reflections. Matplotlib [@Hunter:2007] is used for 2d graphics, while plotly [@plotly] is used for 3D visualization. The author acknowledges funding from the European
+Union’s Horizon 2020 research and innovation programme under the Marie Skłodowska-Curie
+grant agreement No 899987.
 
 # References
