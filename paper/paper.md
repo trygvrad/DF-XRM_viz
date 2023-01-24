@@ -12,8 +12,8 @@ authors:
   affiliation: 1
 affiliations:
 - name: Department of Physics, Technical University of Denmark, Denmark
-index: 1
-date: December 2022
+  index: 1
+date: January 2022
 bibliography: paper.bib
 ---
 
