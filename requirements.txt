@@ -5,8 +5,9 @@ matplotlib==3.5.2
 pandas==1.4.3
 Dans-Diffraction==2.2.0
 plotly==5.9.0
-xraydb==4.4.7
+xraydb==4.5.0
 imageio==2.19.5
 kaleido==0.2.1
 fpdf==1.7.2
 toml==0.10.2
+sqlalchemy==2.0.1
