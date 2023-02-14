@@ -226,7 +226,7 @@ if uploaded_file is not None or crystal != 'Upload':
             front_dir = xtl.Cell.calculateR(front_hkl)[0]
     else:
         front_dir = np.cross(Q,np.array([0,0,1]))
-        if np.sum(front_dir)<0.0001:
+        if np.abs(np.sum(front_dir))<0.0001:
             front_dir = np.cross(Q,np.array([0,1,0]))
         front_index = xtl.Cell.indexQ(front_dir)[0]
         front_index/=np.sqrt(np.sum(front_index**2))
@@ -236,10 +236,7 @@ if uploaded_file is not None or crystal != 'Upload':
             st.write(f'Sample exit surface = ({front_index[0]:.2f},{front_index[1]:.2f},{front_index[2]:.2f})')
 
 
-    if up_dir[0]>0:
-        z_rot = -np.arctan2(up_dir[1],up_dir[0])*180/np.pi
-    else:
-        z_rot = -np.pi/2*np.sign(up_dir[1])*180/np.pi
+    z_rot = -np.arctan2(up_dir[1],up_dir[0])*180/np.pi
     y_rot = -np.arctan2(up_dir[2],np.sqrt(up_dir[0]**2+up_dir[1]**2))*180/np.pi
 
     z_rot_crystal = z_rot
