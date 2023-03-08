@@ -57,7 +57,7 @@ A list of possible Bragg reflections is also shown, together with the relative i
 We note that the intensity expected in DF-XRM is not the same as the intensity in a powder diffraction experiment, where intensity from symmetry-equivalent reflections are summed.
 The brightest reflection is automatically selected, as a bright reflection is desirable in the absence of other considerations.
 
-![2$\theta$ angles and intensity for Bragg-diffraction on LiNbO$_3$ at 17 keV.\label{fig:tab}](table.png){ width=300px }
+![2$\theta$ angles and intensity for Bragg-diffraction on LiNbO$_3$ at 17 keV.\label{fig:tab}](table.png)
 
 Following the table is a 3D visualization of the geometry.
 The visualization makes an initial guess that the selected scattering vector defines "up" in the sample.
