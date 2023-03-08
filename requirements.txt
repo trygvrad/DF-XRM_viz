@@ -8,6 +8,7 @@ plotly==5.9.0
 xraydb==4.5.0
 imageio==2.19.5
 kaleido==0.2.1
+wheel==0.38.4
 fpdf==1.7.2
 toml==0.10.2
 sqlalchemy==2.0.1
