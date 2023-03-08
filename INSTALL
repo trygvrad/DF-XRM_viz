@@ -1,15 +1,20 @@
-# these instructions are tested for python3.8 but should work for more recent versions of python as well
+# these instructions have been tested for python3.10 and 3.8
 
 # optional: set up a virtual environment
-python3.8 -m venv DXV
+python3.10 -m venv DXV
 source DXV/bin/activate
 
 # clone repository
 git clone https://github.com/trygvrad/DF-XRM_viz DF-XRM_vis
 cd DF-XRM_vis
-python3.8 -m pip install -r requirements.txt 
+python3.10 -m pip install -r requirements.txt 
 
 
 # run streamlit 
-python3.8 -m streamlit run DF-XRM_vis_streamlit.py
+python3.10 -m streamlit run DF-XRM_vis_streamlit.py
+# streamlit should open in the browser
 
+# or run jupyter 
+python3.10 -m pip install jupyterlab
+pytnon3.10 -m jupyterlab
+# jupyterlab should open in the browser and you can open 'jupyterlab example.ipynb' from there
