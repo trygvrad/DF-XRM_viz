@@ -31,7 +31,7 @@ Bragg diffraction is scattering from crystallographic planes, and Bragg diffract
 A change in the scattering angle or scattering direction corresponds directly to strain or rotation of the crystal lattice.
 Classical X-ray diffraction techniques allow researchers to describe average strain states, while the aforementioned microscopy techniques improve upon this to give localized strain information, which provides unprecedented detail to describe the relationship between internal strain and material properties.
 Performing an X-ray microscopy experiment requires aligning the sample to the Bragg condition and relating this to the real-space geometry of the sample.
-This is of particular importance for DF-XRM, as the imaging plane of the crystal is not along a crystallographic plane, but is instead at an irrational angle of rotation.
+This is of particular importance for DF-XRM, as the imaging plane of the crystal is not along a crystallographic plane, but instead can be at any orientation to the crystal.
 For DF-XRM, aligning to the Bragg condition involves rotating the sample so that the X-ray beam enters the sample in the correct crystallographic direction, and then positioning the lens and detector in the path of the diffracted beam.
 As a technique used at synchrotron and X-ray free electron laser facilities, all DF-XRM experiments involve a team of external scientists in collaboration with scientists working at the X-ray facility.
 Communication of the experimental geometry is key to a successful experiment, both during experimental planning, execution, and subsequent data analysis.
@@ -57,7 +57,7 @@ A list of possible Bragg reflections is also shown, together with the relative i
 We note that the intensity expected in DF-XRM is not the same as the intensity in a powder diffraction experiment, where intensity from symmetry-equivalent reflections are summed.
 The brightest reflection is automatically selected, as a bright reflection is desirable in the absence of other considerations.
 
-![2$\theta$ angles and intensity for Bragg-diffraction on LiNbO$_3$ at 17 keV.\label{fig:tab}](table.png){ width=200px }
+![2$\theta$ angles and intensity for Bragg-diffraction on LiNbO$_3$ at 17 keV.\label{fig:tab}](table.png){ width=300px }
 
 Following the table is a 3D visualization of the geometry.
 The visualization makes an initial guess that the selected scattering vector defines "up" in the sample.
@@ -84,7 +84,7 @@ A link is provided to generate a pdf with the current details shown in the app. 
 # Comparison to other tools
 
 
-The calculation of absorption spectra can be handled by other web apps or desktop applications, while the calculation of diffracion peaks is commonly done by desktop applications. 
+The calculation of absorption spectra can be handled by other web apps or desktop applications, while the calculation of diffraction peaks is commonly done by desktop applications. 
 `DF-XRM_vis` expands upon previous work by providing multiple features in a single package with minimal input.
 Furthermore, the 3D visualization, is a unique feature of `DF-XRM_vis` specifically tailored to then needs of the DF-XRM community.
 As for the lens alignment, there are other tools that can calculate the focal power of a lensbox for X-rays, but a large number of parameters must be specified (lens material, wavelength, position of lenslets, radius of curvature of each lenslet, etc.).
@@ -94,7 +94,7 @@ Bundling the lens configuration into the same web app means that fewer parameter
 
 This tool is built initially for DF-XRM, and therefore includes the option of visualizing the lens specific to this technique. Specific options relating to other microscopy techniques based on Bragg diffraction may be implemented in the future.
 We also note that the first report of DF-XRM at the European Synchrotron Radiation Facility was published in 2015 [@simons2015dark].
-DF-XRM has since been implemented at the Stanford Linear Accelerator [@holstad2022real], the Advanced light Source [@qiao2020large], and there have been as-of-yet unpublished activities also at other X-ray sources.
+DF-XRM has since been implemented at the Linac Coherent Light Source (LCLS) [@holstad2022real], the Advanced light Source [@qiao2020large], and there have been as-of-yet unpublished activities also at other X-ray sources.
 
 # Acknowledgements
 
