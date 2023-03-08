@@ -1,0 +1,15 @@
+# these instructions are tested for python3.8 but should work for more recent versions of python as well
+
+# optional: set up a virtual environment
+python3.8 -m venv DXV
+source DXV/bin/activate
+
+# clone repository
+git clone https://github.com/trygvrad/DF-XRM_viz DF-XRM_vis
+cd DF-XRM_vis
+python3.8 -m pip install -r requirements.txt 
+
+
+# run streamlit 
+python3.8 -m streamlit run DF-XRM_vis_streamlit.py
+
