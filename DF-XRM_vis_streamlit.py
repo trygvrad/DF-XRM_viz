@@ -13,6 +13,7 @@ from libs import absorption_plots
 from libs import draw_crystal_structures
 from libs import three_d_draw
 from libs import optics_geometry
+from libs import orientation_helpers
 def get_binary_file_downloader_html(bin_file, file_label='File'):
     '''
     provides a link to a file that can be downloaded
@@ -177,19 +178,13 @@ if uploaded_file is not None or crystal != 'Upload':
                            'd spacing [Å]': "{:.3f}",
                           }
                 ))
-
     #######################################################################
     ################################ get Q ################################
     #######################################################################
 
     st.sidebar.markdown('Scattering vector')
     hkl_str = st.sidebar.text_input('Q vector (h, k, l)', '('+li[0][0][1:-1]+')') #min, max, default
-    hkl_spli = hkl_str.strip('()').split(',')
-    h = int(hkl_spli[0])
-    k = int(hkl_spli[1])
-    l = int(hkl_spli[2])
-    params['hkl'] = np.array([h,k,l]) #'3, 3, 3'
-    Q = xtl.Cell.calculateQ(params['hkl'])[0]
+    params['hkl'], Q = orientation_helpers.Q_from_hkl_string(xtl, hkl_str)
 
     #######################################################################
     ####### the rotation of the crystal with respect to the sample ########
@@ -206,28 +201,13 @@ if uploaded_file is not None or crystal != 'Upload':
     front_hkl_str = st.sidebar.text_input('Exit surface ~(h,k,l) or ~[u,v,w,] (x-arrow in figure)', '') #min, max, default
     st.sidebar.write("For the exit surface, only the component orthogonal to sample 'up' is perserved")
 
-    if not up_hkl_str == '':
-        s = up_hkl_str.strip('[()]').split(',')
-        up_hkl = np.array([float(s[0]),float(s[1]),float(s[2])])
-        if '(' in up_hkl_str:
-            up_dir = xtl.Cell.calculateQ(up_hkl)[0]
-        else:
-            up_dir = xtl.Cell.calculateR(up_hkl)[0]
-    else:
-        up_dir = Q
+    up_dir = orientation_helpers.up_dir_from_string(xtl, up_hkl_str, Q)
+    if up_hkl_str == '':
         st.write(f'Sample up direction = Q')
+    
+    front_dir = orientation_helpers.front_dir_from_string(xtl, front_hkl_str, Q)
 
-    if not front_hkl_str == '':
-        s = front_hkl_str.strip('[()]').split(',')
-        front_hkl = np.array([float(s[0]),float(s[1]),float(s[2])])
-        if '(' in front_hkl_str:
-            front_dir = xtl.Cell.calculateQ(front_hkl)[0]
-        else:
-            front_dir = xtl.Cell.calculateR(front_hkl)[0]
-    else:
-        front_dir = np.cross(Q,np.array([0,0,1]))
-        if np.abs(np.sum(front_dir))<0.0001:
-            front_dir = np.cross(Q,np.array([0,1,0]))
+    if front_hkl_str == '':
         front_index = xtl.Cell.indexQ(front_dir)[0]
         front_index/=np.sqrt(np.sum(front_index**2))
         if front_index[0]%1 == 0 and front_index[1]%1 == 0 and front_index[2]%1 == 0:
@@ -238,24 +218,17 @@ if uploaded_file is not None or crystal != 'Upload':
 
     z_rot = -np.arctan2(up_dir[1],up_dir[0])*180/np.pi
     y_rot = -np.arctan2(up_dir[2],np.sqrt(up_dir[0]**2+up_dir[1]**2))*180/np.pi
+    
+    x_rot = 0
 
-    z_rot_crystal = z_rot
-    y_rot_crystal = y_rot
-    x_rot_crystal = 0
-
-    def crystal_rotation_function(hkl):
-        '''
-        function that describes rotation in cartesian coordinates of crystal structure or reciprocal space
-        performes an in-place rotation on a numpy array of length three
-        '''
-        draw_crystal_structures.rotate_z(hkl, z_rot_crystal*np.pi/180)# 45 degree rotation around the x-axis -> swap b and c
-        draw_crystal_structures.rotate_y(hkl, y_rot_crystal*np.pi/180)# 45 degree rotation around the x-axis -> swap b and c
-        draw_crystal_structures.rotate_x(hkl, x_rot_crystal*np.pi/180)# 45 degree rotation around the x-axis -> swap b and c
-        return hkl
-
-    front_dir_r = crystal_rotation_function(np.copy(front_dir))
+    cr = orientation_helpers.crystal_rotation(z_rot, y_rot, x_rot)
+    front_dir_r = cr.rotate(np.copy(front_dir))
+    
     x_rot = np.arctan2(front_dir_r[1],front_dir_r[2])*180/np.pi
-    x_rot_crystal = x_rot
+    
+    cr = orientation_helpers.crystal_rotation(z_rot, y_rot, x_rot)
+    crystal_rotation_function = cr.rotate
+
 
     Q = crystal_rotation_function(Q)*10**4 # in inverse um
     params['Q_vector'] =  Q
@@ -280,12 +253,7 @@ if uploaded_file is not None or crystal != 'Upload':
         beam_exit_hkl_str = st.sidebar.text_input('Beam exit direction ~(h,k,l) or ~[u,v,w,]', '') #min, max, default
         st.sidebar.write("For the 'Beam exit direction', only the component orthogonal to Q is perserved")
     if not is_beam_norm and not beam_exit_hkl_str == '':
-        s = beam_exit_hkl_str.strip('[()]').split(',')
-        beam_exit_hkl = np.array([float(s[0]),float(s[1]),float(s[2])])
-        if '(' in beam_exit_hkl_str:
-            beam_exit_dir = xtl.Cell.calculateQ(beam_exit_hkl)[0]
-        else:
-            beam_exit_dir = xtl.Cell.calculateR(beam_exit_hkl)[0]
+        beam_exit_dir = orientation_helpers.direction_from_string(xtl, beam_exit_hkl_str)
     else:
         beam_exit_dir = front_dir
         exit_index = xtl.Cell.indexQ(beam_exit_dir)[0]
@@ -313,7 +281,7 @@ if uploaded_file is not None or crystal != 'Upload':
     params['k0_vector'] = -0.5*params['Q_vector'] + x*k_dir_orthogonal_to_Q
     params['kh_vector'] = 0.5*params['Q_vector'] + x*k_dir_orthogonal_to_Q
     two_theta = 2*np.arcsin(np.sqrt(np.sum(params['Q_vector']**2))*params['wavelength_in_um']/4/np.pi)*180/np.pi
-    st.write(f'Instrument alignment on [{"".join(hkl_spli)}]:  \n 2𝜃 = {two_theta:.3f}')
+    st.write(f'Instrument alignment on ({"".join(hkl_str.strip("()").split(","))}):  \n 2𝜃 = {two_theta:.3f}')
 
     #######################################################################
     ###################### make 3d visualization ##########################
@@ -464,7 +432,7 @@ if uploaded_file is not None or crystal != 'Upload':
         txt.append(f'Using {url}')
         txt.append(f'{material_str}\nDensity: {xtl.Properties.density():.3f} gm/cm3')
         txt.append(cell_par[0])
-        txt.append('A = ' +cell_par[1])
+        txt.append('A = ' +cell_par[1].replace('Volume',' Volume'))
         txt.append(f'Q vector hkl {hkl_str}')
         txt.append(f'2theta = {two_theta:.3f}')
 

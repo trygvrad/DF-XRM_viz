@@ -2,33 +2,6 @@ from libs import three_d_draw_object_classes as object_classes
 from libs import three_d_draw
 import numpy as np
 
-########################## crystal rotation functions #####################
-def rotate(x,z,phi):# 2D rotation function
-    '''
-    generic rotation function for generating the crystal rotation functions
-    '''
-    return x*np.cos(phi)-z*np.sin(phi), z*np.cos(phi)+x*np.sin(phi)
-def rotate_x(loc,phi):#rotate_x: rotates around x axis (horisontal)
-    '''
-    in-place rotation around x axis for generating the crystal rotation function
-    '''
-    x,z=rotate(loc[1],loc[2],phi)
-    loc[1] = x
-    loc[2] = z
-def rotate_y(loc,phi):# rotate_y: rotates around y axis (vertical)
-    '''
-    in-place rotation around y axis for generating the crystal rotation function
-    '''
-    x,z=rotate(loc[0],loc[2],phi)
-    loc[0] = x
-    loc[2] = z
-def rotate_z(loc,phi):#rotate_z: rotates around z axis (out-of-plane)
-    '''
-    in-place rotation around z axis for generating the crystal rotation function
-    '''
-    x,z=rotate(loc[0],loc[1],phi)
-    loc[0] = x
-    loc[1] = z
 
 def add_crystal_structure( cif_file, scale = 4.0, rotation_function = None, legend_pos_shift = [0,0,0], cage_list = ['Ti', 'Nb'], axes_shift=None, make_bonds = ['X','X'], linewidth=1,
                             max_bond_length = 2.5, min_bond_length = 0,
