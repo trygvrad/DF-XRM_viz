@@ -56,6 +56,10 @@ def test_geometry():
     z_rot_answer = 0
     y_rot_answer = -90
     x_rot_answer = 120
+    
+    im_2d_compare = PIL.Image.open("tests/2dfig.png")
+    im_3d_compare = PIL.Image.open("tests/3dfig.png")
+    im_optics_compare = PIL.Image.open("tests/fig_optics.png")
     ##############
     
     
@@ -296,4 +300,13 @@ def test_geometry():
         pdf.image('fig_optics.png', w=200)
 
     pdf.output('test.pdf')
+    
+    # compare figures
+    im_2d = PIL.Image.open("2dfig.png")
+    assert np.allclose(np.array(im_2d), np.array(im_2d_compare)), f'3D figure changed, check if this is intended!' 
+    im_3d = PIL.Image.open("3dfig.png")
+    assert np.allclose(np.array(im_3d), np.array(im_3d_compare)), f'2D figure changed, check if this is intended!' 
+    im_optics = PIL.Image.open("fig_optics.png")
+    assert np.allclose(np.array(im_optics), np.array(im_optics_compare)), f'optics figure changed, check if this is intended!' 
+    
 
