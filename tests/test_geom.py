@@ -35,16 +35,16 @@ def test_geometry():
     params['wavelength_in_um'] = 4.135667696*10**-15 *299792458 / energy_kev /1000*10**6 #7.2932e-5 #7.2932e-11 m = 17 keV
     params['shape'] = np.array([5000,5000,sample_thickness])
     url = 'http://www.crystallography.net/cod/1533978.cif'
-     
+
     crystal = 'MnO3Y'
-    
+
     hkl_str = '(1,0,1)'
     up_hkl_str = '(0,0,1)'
     front_hkl_str = '(0,1,0)'
-    
-    is_beam_norm = False# "Minimize distance beam travels through sample" 
+
+    is_beam_norm = False# "Minimize distance beam travels through sample"
     beam_exit_hkl_str = '(0,1,0)' # only used if is_beam_norm == False
-    
+
     lens_file_path = f'assets/lens_files/id06.lens'
     mainx = "d_tot' = 5000" # sample-detector distance, "d_tot or d_tot' [mm]"
 
@@ -56,29 +56,29 @@ def test_geometry():
     z_rot_answer = 0
     y_rot_answer = -90
     x_rot_answer = 120
-    
+
     im_2d_compare = PIL.Image.open("tests/2dfig.png")
     im_3d_compare = PIL.Image.open("tests/3dfig.png")
     im_optics_compare = PIL.Image.open("tests/fig_optics.png")
     ##############
-    
-    
-    # setup 
+
+
+    # setup
     cif_file = get_cif_file(url)
     xtl = Dans_Diffraction.Crystal(cif_file)
     xtl.generate_lattice()
     xtl.Scatter.setup_scatter(scattering_type='xray', energy_kev=energy_kev)
-    
+
     material_str = ''.join(xtl.cif['_chemical_formula_sum'].replace('2','$_2$').replace('3','$_3$').split(' '))
-    
+
     cell_par = str(xtl.Cell)
     cell_par = cell_par.replace('\n','').replace('\r','')
     cell_par = cell_par.split('A = ')
-    # make absorption fig    
+    # make absorption fig
     fig2d = absorption_plots.get_att_plot(xtl, energy_kev, sample_thickness)
     fig2d.savefig('2dfig.png')
-    
-    # scattering table 
+
+    # scattering table
     xtl.Scatter._scattering_max_twotheta = 45
     reflections = xtl.Scatter.print_all_reflections().split('\n')
     li = []
@@ -94,7 +94,7 @@ def test_geometry():
     df = pd.DataFrame(li, columns = [' '.join(spl[:-2]), '2𝜃', spl[-1]+' [%]', 'd-spacing [Å]'])
     pd.set_option('display.max_rows', 300)
     tab = str(df)
-    
+
     # orientation
     hkl_spli = hkl_str.strip('()').split(',')
     h = int(hkl_spli[0])
@@ -102,42 +102,42 @@ def test_geometry():
     l = int(hkl_spli[2])
     params['hkl'] = np.array([h,k,l]) #'3, 3, 3'
     Q = xtl.Cell.calculateQ(params['hkl'])[0]
-    
+
     up_dir = orientation_helpers.up_dir_from_string(xtl, up_hkl_str, Q)
     front_dir = orientation_helpers.front_dir_from_string(xtl, front_hkl_str, Q)
-    
+
     z_rot = -np.arctan2(up_dir[1],up_dir[0])*180/np.pi
     y_rot = -np.arctan2(up_dir[2],np.sqrt(up_dir[0]**2+up_dir[1]**2))*180/np.pi
 
-    
+
     x_rot = 0
 
     cr = orientation_helpers.crystal_rotation(z_rot, y_rot, x_rot)
     front_dir_r = cr.rotate(np.copy(front_dir))
-    
+
     x_rot = np.arctan2(front_dir_r[1],front_dir_r[2])*180/np.pi
-    
+
     cr = orientation_helpers.crystal_rotation(z_rot, y_rot, x_rot)
     crystal_rotation_function = cr.rotate
 
-    
+
     print(f'z_rot, y_rot, x_rot = {z_rot}, {y_rot}, {x_rot}')
     assert np.allclose(np.array([z_rot, y_rot, x_rot]),\
            np.array([z_rot_answer, y_rot_answer, x_rot_answer])),  \
           f'np.array([z_rot, y_rot, x_rot]) vector not as expected '+\
           f'{np.array([z_rot, y_rot, x_rot])} expected'+\
-          f' {np.array([z_rot_answer, y_rot_answer, x_rot_answer])}' 
+          f' {np.array([z_rot_answer, y_rot_answer, x_rot_answer])}'
 
     Q = crystal_rotation_function(Q)*10**4 # in inverse um
     params['Q_vector'] =  Q
-    
-    print(f'Q: {Q}')
-    assert np.allclose(Q, Q_answer), f'Q vector not as expected {Q} expected {Q_answer}' 
 
-    
+    print(f'Q: {Q}')
+    assert np.allclose(Q, Q_answer), f'Q vector not as expected {Q} expected {Q_answer}'
+
+
     k_abs = 2*np.pi/params['wavelength_in_um']
     Q = np.linalg.norm(params['Q_vector'])
-    
+
     '''is_beam_norm = st.sidebar.checkbox("Minimize distance beam travels through sample", True)
     beam_exit_hkl_str = ''
     if not is_beam_norm:
@@ -154,13 +154,13 @@ def test_geometry():
     k_dir_orthogonal_to_Q = np.cross(plane_normal,params['Q_vector'])
     k_ort_l = np.linalg.norm(k_dir_orthogonal_to_Q)
 
-    
+
     x = np.sqrt(  ( k_abs**2 - 0.25*Q**2 ) / ( k_ort_l**2) )
     params['k0_vector'] = -0.5*params['Q_vector'] + x*k_dir_orthogonal_to_Q
     params['kh_vector'] = 0.5*params['Q_vector'] + x*k_dir_orthogonal_to_Q
     two_theta = 2*np.arcsin(np.sqrt(np.sum(params['Q_vector']**2))*params['wavelength_in_um']/4/np.pi)*180/np.pi
     print(f'two_theta: {two_theta}')
-    assert two_theta == two_theta_answer, f'two_theta not as expected {two_theta} expected {two_theta_answers}' 
+    assert two_theta == two_theta_answer, f'two_theta not as expected {two_theta} expected {two_theta_answers}'
 
     # make 3d fig  -  default options
     scale = 1.0
@@ -175,7 +175,7 @@ def test_geometry():
     make_bonds = ['C','C']
     max_bond_length = 2.5
     min_bond_length = 0
-    show_text = True
+    show_text = False # to ensure compatability with the font in plotly on github VS local
     lens_scale = 1.0
     params['transverse_width'] = 100.0
     params['beam_thickness'] = 10.0
@@ -215,7 +215,7 @@ def test_geometry():
                 show_text = show_text,
                 magnification = magnification,
                 )
-    
+
     # make lens fig
     if "d_tot'" in mainx:
         d_tot = float(mainx.split("=")[1])/np.cos(two_theta*np.pi/180)
@@ -227,9 +227,9 @@ def test_geometry():
     fig_optics, ax = optics_geometry.make_optics_geometry_plot(\
                     energy_kev, two_theta, d_tot, parsed_lens_file)
     fig_optics.savefig('fig_optics.png')
-    
-    
-    # make pdf 
+
+
+    # make pdf
     pdf = fpdf.FPDF(orientation = 'P', unit = 'mm', format = 'A4')
     pdf.add_page()
     pdf.set_font('helvetica', '', 10)
@@ -300,13 +300,11 @@ def test_geometry():
         pdf.image('fig_optics.png', w=200)
 
     pdf.output('test.pdf')
-    
+
     # compare figures
     im_2d = PIL.Image.open("2dfig.png")
-    assert np.allclose(np.array(im_2d), np.array(im_2d_compare)), f'3D figure changed, check if this is intended!' 
+    assert np.allclose(np.array(im_2d), np.array(im_2d_compare)), f'2D figure changed, check if this is intended!'
     im_3d = PIL.Image.open("3dfig.png")
-    assert np.allclose(np.array(im_3d), np.array(im_3d_compare)), f'2D figure changed, check if this is intended!' 
+    assert np.allclose(np.array(im_3d), np.array(im_3d_compare)), f'3D figure changed, check if this is intended!'
     im_optics = PIL.Image.open("fig_optics.png")
-    assert np.allclose(np.array(im_optics), np.array(im_optics_compare)), f'optics figure changed, check if this is intended!' 
-    
-
+    assert np.allclose(np.array(im_optics), np.array(im_optics_compare)), f'optics figure changed, check if this is intended!'
