@@ -29,6 +29,12 @@ def get_binary_file_downloader_html(bin_file, file_label='File'):
     href = f'<a href="data:application/octet-stream;base64,{bin_str}" download="{os.path.basename(bin_file)}">Download {file_label}</a>'
     return href
 
+# this is a gray semi-transparent image
+# it ensures that the background is not completely white or black
+# in this way the border between the figures and background is always clear
+with open('bg.png', "rb") as image_file:
+    encoded_string = base64.b64encode(image_file.read())
+
 st.markdown(
         f"""
 <style>
@@ -39,10 +45,11 @@ st.markdown(
         padding-left: {2}rem;
         padding-bottom: {10}rem;
     }}
-    .appview-container .main {{
-        color: {"#000000"};
-        background-color: {"#EAEAEA"};
-    }}
+    .stApp {{
+             background-image: url(data:image/{"png"};base64,{encoded_string.decode()});
+             background-attachment: fixed;
+             background-size: cover
+   }}
 </style>
 """,
         unsafe_allow_html=True,
@@ -204,7 +211,7 @@ if uploaded_file is not None or crystal != 'Upload':
     up_dir = orientation_helpers.up_dir_from_string(xtl, up_hkl_str, Q)
     if up_hkl_str == '':
         st.write(f'Sample up direction = Q')
-    
+
     front_dir = orientation_helpers.front_dir_from_string(xtl, front_hkl_str, Q)
 
     if front_hkl_str == '':
@@ -218,14 +225,14 @@ if uploaded_file is not None or crystal != 'Upload':
 
     z_rot = -np.arctan2(up_dir[1],up_dir[0])*180/np.pi
     y_rot = -np.arctan2(up_dir[2],np.sqrt(up_dir[0]**2+up_dir[1]**2))*180/np.pi
-    
+
     x_rot = 0
 
     cr = orientation_helpers.crystal_rotation(z_rot, y_rot, x_rot)
     front_dir_r = cr.rotate(np.copy(front_dir))
-    
+
     x_rot = np.arctan2(front_dir_r[1],front_dir_r[2])*180/np.pi
-    
+
     cr = orientation_helpers.crystal_rotation(z_rot, y_rot, x_rot)
     crystal_rotation_function = cr.rotate
 
