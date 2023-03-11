@@ -28,7 +28,22 @@ def get_cif_file(url):
 
 
 def test_geometry():
-    # input
+    '''
+    Test function designed to give reasonable code coverage.
+    Priority is given to testing geometry (rotations, Q-vector)
+
+    The majority of the code here is a copy of the code in DF-XRM_vis_streamlit.py
+    If a test fails, it is most likely because of changes to
+    DF-XRM_vis_streamlit.py that have not been reproduced here.
+
+    If you make any changes that affect the rendering of figures, make sure you
+    upload new versions of 2dfig.png, 3dfig.png and/or fig_optics.png in tests/.
+    The figures can be generated (in the root directory) by running pytest locally.
+    But make sure you are confident in the new versions before you change them!
+    '''
+    #################################################################
+    ################     configuration of  test     #################
+    #################################################################
     energy_kev = 17
     sample_thickness = 150
     params = {}
@@ -48,8 +63,9 @@ def test_geometry():
     lens_file_path = f'assets/lens_files/id06.lens'
     mainx = "d_tot' = 5000" # sample-detector distance, "d_tot or d_tot' [mm]"
 
-    #############
-    # answers for tests
+    #################################################################
+    ###################     answers for test      ###################
+    #################################################################
     Q_answer = np.array([5490.7589723,  10219.38634624,  5900.16545805])
     two_theta_answer = 8.664149507727018
 
@@ -60,8 +76,10 @@ def test_geometry():
     im_2d_compare = PIL.Image.open("tests/2dfig.png")
     im_3d_compare = PIL.Image.open("tests/3dfig.png")
     im_optics_compare = PIL.Image.open("tests/fig_optics.png")
-    ##############
 
+    #################################################################
+    ###################     running tests     #######################
+    #################################################################
 
     # setup
     cif_file = get_cif_file(url)
