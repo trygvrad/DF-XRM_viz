@@ -16,5 +16,5 @@ python3.10 -m streamlit run DF-XRM_vis_streamlit.py
 
 # or run jupyter 
 python3.10 -m pip install jupyterlab
-pytnon3.10 -m jupyterlab
+python3.10 -m jupyterlab
 # jupyterlab should open in the browser and you can open 'jupyterlab example.ipynb' from there
