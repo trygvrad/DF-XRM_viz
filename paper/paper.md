@@ -61,7 +61,7 @@ The brightest reflection is automatically selected, as a bright reflection is de
 
 Following the table is a 3D visualization of the geometry.
 The visualization makes an initial guess that the selected scattering vector defines "up" in the sample.
-This is a reasonable assumption in many cases, but the option is provided to specify a differnt orientation using orthogonal facets.
+This is a reasonable assumption in many cases, but the option is provided to specify a different orientation using orthogonal facets.
 Facets are described using Miller indices, and both reciprocal space lattice vectors (h,k,l), or real space lattice vectors [u,v,w] are accepted.
 The visualization includes a unit cell of the material, which allows researchers to easily connect the direction in which they measure strain, and relate this to the plane defined by the incoming beam (imaging plane).
 A parallel projection is used to facilitate easy comparison of angles in the figure.
@@ -99,7 +99,7 @@ DF-XRM has since been implemented at the Linac Coherent Light Source (LCLS) [@ho
 # Acknowledgements
 
 `DF-XRM_vis` relies upon the python package Dans_Diffraction [@dan_porter_2020_3859501] to read `.cif` files and identify Bragg reflections. Matplotlib [@Hunter:2007] is used for 2d graphics, while plotly [@plotly] is used for 3D visualization. The author acknowledges funding from the European
-Union’s Horizon 2020 research and innovation programme under the Marie Skłodowska-Curie
+Union’s Horizon 2020 research and innovation program under the Marie Skłodowska-Curie
 grant agreement No 899987.
 
 # References
