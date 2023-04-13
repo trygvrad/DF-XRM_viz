@@ -379,7 +379,7 @@ if uploaded_file is not None or crystal != 'Upload':
     for i in range(len(outstr)):
         st.write(outstr[i].replace('phi','𝜑').replace('chi','𝜒').replace('omega','𝜔'))
 
-    st.plotly_chart(fig)
+    st.plotly_chart(fig,use_container_width=True)
     #######################################################################
     ####################### show optics geometry ##########################
     #######################################################################
