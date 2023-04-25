@@ -505,5 +505,7 @@ if uploaded_file is not None or crystal != 'Upload':
     st.markdown(get_binary_file_downloader_html('assets/blender_import_script.py', 'blender import script'), unsafe_allow_html=True)
 
 
+st.markdown('---')
+st.markdown("To reference this work, please cite the paper published in the Journal of Open Source Software [![DOI](https://joss.theoj.org/papers/10.21105/joss.05177/status.svg)](https://doi.org/10.21105/joss.05177)", unsafe_allow_html=False)
 st.write("This is version 2.1.x. Souce code available at https://github.com/trygvrad/DF-XRM_viz under MIT lisence.")
 st.write("please report bugs to tmara@dtu.dk, or contribute directly at github.")
