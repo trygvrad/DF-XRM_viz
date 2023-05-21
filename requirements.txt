@@ -3,7 +3,7 @@ numpy==1.23.1
 streamlit==1.11.0
 matplotlib==3.5.2
 pandas==1.4.3
-Dans-Diffraction==2.2.0
+Dans-Diffraction==2.2.3
 plotly==5.9.0
 xraydb==4.5.0
 imageio==2.19.5
