@@ -6,7 +6,7 @@ You may run a standalone version by using streamlit locally by calling
 streamlit run DF-XRM_vis_streamlit.py
 ```
 or run the jupyter example.
-
+ 
 # Usage
 
 Sample absorption
