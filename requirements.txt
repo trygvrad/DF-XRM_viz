@@ -1,6 +1,7 @@
 scipy==1.8.1
 numpy==1.23.1
 streamlit==1.11.0
+altair==4.2.2
 matplotlib==3.5.2
 pandas==1.4.3
 Dans-Diffraction==2.2.3
