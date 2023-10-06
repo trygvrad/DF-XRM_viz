@@ -14,7 +14,6 @@ from libs import draw_crystal_structures
 from libs import three_d_draw
 from libs import optics_geometry
 from libs import orientation_helpers
-from libs import save_blender
 def get_binary_file_downloader_html(bin_file, file_label='File'):
     '''
     provides a link to a file that can be downloaded
@@ -505,22 +504,25 @@ if uploaded_file is not None or crystal != 'Upload':
     st.markdown(get_binary_file_downloader_html('DF_XRM_vis_to_blender.pickled', 'pickled 3d structure for blender'), unsafe_allow_html=True)
     st.markdown(get_binary_file_downloader_html('assets/blender_import_script.py', 'blender import script'), unsafe_allow_html=True)
 
-    make_blend = st.checkbox("Direct blender export (experimental)")
-    if make_blend:
-        if 0:
-            '''
-            This must run in separate process because bpy does not support threading
-            and streamlit is multithreaded.
-            Use 'just_save.py' if to debug `save_blender.save_blend()`.
-            '''
-        from multiprocessing import Process
-        proc = Process(target=save_blender.save_blend, args=(three_d_objects, 'export.blend'))
+    try:
+        from libs import save_blender
+        make_blend = st.checkbox("Direct blender export (experimental)")
+        if make_blend:
+            if 0:
+                '''
+                This must run in separate process because bpy does not support threading
+                and streamlit is multithreaded.
+                Use 'just_save.py' if to debug `save_blender.save_blend()`.
+                '''
+            from multiprocessing import Process
+            proc = Process(target=save_blender.save_blend, args=(three_d_objects, 'export.blend'))
 
-        proc.start()
-        proc.join()
-        #save_blender.save_blend(three_d_objects, 'export.blend')
-        st.markdown(get_binary_file_downloader_html('export.blend', 'export.blend'), unsafe_allow_html=True)
-
+            proc.start()
+            proc.join()
+            #save_blender.save_blend(three_d_objects, 'export.blend')
+            st.markdown(get_binary_file_downloader_html('export.blend', 'export.blend'), unsafe_allow_html=True)
+    except:
+        None
 
 st.markdown('---')
 st.markdown("To reference this work, please cite the paper published in the Journal of Open Source Software [![DOI](https://joss.theoj.org/papers/10.21105/joss.05177/status.svg)](https://doi.org/10.21105/joss.05177)", unsafe_allow_html=False)
