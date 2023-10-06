@@ -3,3 +3,4 @@ libxxf86vm-dev
 libxfixes-dev
 libxi-dev
 libxkbcommon-dev
+libsm-dev
