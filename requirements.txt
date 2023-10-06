@@ -1,4 +1,4 @@
-bpy==3.6.0
+bpy
 scipy==1.8.1
 numpy==1.23.1
 streamlit==1.11.0
