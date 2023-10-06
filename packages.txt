@@ -4,3 +4,4 @@ libxfixes-dev
 libxi-dev
 libxkbcommon-dev
 libsm-dev
+libgl-dev
