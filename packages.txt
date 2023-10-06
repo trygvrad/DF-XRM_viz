@@ -2,3 +2,4 @@ libxrender1
 libxxf86vm-dev
 libxfixes-dev
 libxi-dev
+libxkbcommon-dev
