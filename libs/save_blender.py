@@ -3,7 +3,6 @@ import bpy
 import math
 from mathutils import Vector, Matrix
 import numpy as np
-import inspect, os
 import time
 
 
