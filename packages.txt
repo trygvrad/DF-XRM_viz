@@ -1,2 +1,3 @@
 libxrender1
 libxxf86vm-dev
+libxfixes-dev
