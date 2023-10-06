@@ -522,7 +522,7 @@ if uploaded_file is not None or crystal != 'Upload':
             #save_blender.save_blend(three_d_objects, 'export.blend')
             st.markdown(get_binary_file_downloader_html('export.blend', 'export.blend'), unsafe_allow_html=True)
     except:
-        None
+        _ = None
 
 st.markdown('---')
 st.markdown("To reference this work, please cite the paper published in the Journal of Open Source Software [![DOI](https://joss.theoj.org/papers/10.21105/joss.05177/status.svg)](https://doi.org/10.21105/joss.05177)", unsafe_allow_html=False)
