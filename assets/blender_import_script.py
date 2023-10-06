@@ -10,9 +10,11 @@ Usage:
 import bpy
 import pickle
 import math
-from mathutils import Vector
+from mathutils import Vector, Matrix
 import numpy as np
 import inspect, os
+import time
+
 
 def dir_of_this():
     '''
@@ -66,6 +68,18 @@ def create_quadrilateral(nodes, name):
 
     return myobject, mymesh
 
+
+bpy.ops.mesh.primitive_cylinder_add(
+    vertices=32,
+    radius=1,
+    depth=1,
+    enter_editmode=False,
+)
+cyl = bpy.context.object.data
+cyl.name = 'tmp'
+bpy.data.objects.remove(bpy.context.object, do_unlink=True)
+
+
 def make_line(nodes, name, r=0.1):
     '''
     line connecting the nodes in nodes
@@ -79,18 +93,24 @@ def make_line(nodes, name, r=0.1):
     d10 = nodes[1]-nodes[0]
     dist = np.sqrt(np.sum(d10**2))
 
-    mesh = bpy.ops.mesh.primitive_cylinder_add(
-        radius = r,
-        depth = dist,
-        location = np.average(nodes,axis=0)
-        )
+    mesh = cyl.copy()
+    #bpy.ops.mesh.primitive_cylinder_add(
+    #    radius = r,
+    #    depth = dist,
+    #    location = np.average(nodes,axis=0)
+    #    )
+    mesh.transform(Matrix.Diagonal([r, r, dist, 1]))
+    mesh.name = name
+
+    ob = bpy.data.objects.new(name, mesh)
+    ob.location = np.average(nodes,axis=0)
     phi = math.atan2(d10[1], d10[0])
     theta = math.acos(d10[2]/dist)
-    myobject = bpy.context.object
-    bpy.context.object.rotation_euler[1] = theta
-    bpy.context.object.rotation_euler[2] = phi
-
-    return myobject
+    #myobject = bpy.context.object
+    bpy.context.collection.objects.link(ob)
+    ob.rotation_euler[1] = theta
+    ob.rotation_euler[2] = phi
+    return ob #myobject
 
 
 
@@ -123,13 +143,23 @@ def set_mat_keys(mat,color):
     mat.node_tree.nodes["Principled BSDF"].inputs['Transmission'].default_value = 0.5
 
 
+mat_dict_face = {}
+mat_dict_box = {}
+mat_dict_line = {}
+collection_dict = {}
+
 ############## read pickle
 objects = pickle.load( open( path, "rb" ) )
 ############## make a new collection
-collection = bpy.data.collections.new("new_collection")
-bpy.context.scene.collection.children.link(collection)  # Link collection to scene
+main_collection = bpy.data.collections.new("DF_XRM_vis")
+bpy.context.scene.collection.children.link(main_collection)  # Link collection to scene
 ############## import objects in pickle to scene
+t0 = time.time()
 for i, object in enumerate(objects):
+    if i%10 ==1:
+        dt = time.time() - t0
+        frac = i/len(objects)
+        print(f'{i}, {frac*100:.3f} %, {dt:.1f} s, remaining {(1-frac)*dt/frac:.1f} s, {object["type"]}')
     if object['type']=='Mesh':
 
         mesh = bpy.data.meshes.new(str(i))   # create a new mesh
@@ -137,38 +167,85 @@ for i, object in enumerate(objects):
                 f.use_smooth = True
         ob = bpy.data.objects.new(str(i), mesh)      # create an object with that mesh
         ob.location = Vector((0,0,0)) #by.context.scene.cursor_location   # position object at 3d-cursor
+        mat_str = str(object['facecolor'])
+        if not mat_str in mat_dict_face.keys():
+            mat = bpy.data.materials.new(str(i))
+            ob.active_material = mat
+            mat.diffuse_color = object['facecolor']
+            mat.use_nodes=True
+            nodes = mat.node_tree.nodes
+            links = mat.node_tree.links
+            mat_dict_face[mat_str] = mat
+            set_mat_keys(mat,object['facecolor'])
+        else:
+            mat = mat_dict_face[mat_str]
+        col_str = 'face'+mat_str+str(i//10000)
+        if not col_str in collection_dict.keys():
+            collection = bpy.data.collections.new("face_"+str(i))
+            main_collection.children.link(collection)  # Link collection to scene
+            collection_dict[col_str] = collection
+        else:
+            collection = collection_dict[col_str]
 
         collection.objects.link(ob)                # Link object to collection
         # st up material
-        mat = bpy.data.materials.new(str(i))
         ob.active_material = mat
-        mat.diffuse_color = object['facecolor']
-        mat.use_nodes=True
-        nodes = mat.node_tree.nodes
-        links = mat.node_tree.links
-        ob.active_material = mat
-        set_mat_keys(mat,object['facecolor'])
-
-        mesh.from_pydata(list(object['nodes']*10**-3),[],list(object['faces']))   # edges or faces should be [], or you ask for problems
+        nodes = np.stack((object['nodes'][:,0], -object['nodes'][:,2], object['nodes'][:,1] ), axis = -1)
+        mesh.from_pydata(list(nodes*10**-3),[],list(object['faces']))   # edges or faces should be [], or you ask for problems
         mesh.update(calc_edges=True)    # Update mesh with new data
 
     elif object['type']=='BoxFacet':
-        ob, mesh = create_quadrilateral(object['span']*10**-3, str(i))
-        mat = bpy.data.materials.new(str(i))
-        mat.diffuse_color = object['facecolor']
-        mat.use_nodes=True
+        mat_str = str(object['facecolor'])
+        if not mat_str in mat_dict_box.keys():
+            mat = bpy.data.materials.new(str(i))
+            mat.diffuse_color = object['facecolor']
+            mat.use_nodes=True
+            mat_dict_box[mat_str] = mat
+            set_mat_keys(mat,object['facecolor'])
+        else:
+            mat = mat_dict_box[mat_str]
+        col_str = 'box'+mat_str+str(i//10000)
+        if not col_str in collection_dict.keys():
+            collection = bpy.data.collections.new("box_"+str(i))
+            main_collection.children.link(collection)  # Link collection to scene
+            collection_dict[col_str] = collection
+        else:
+            collection = collection_dict[col_str]
+        layer_collection = bpy.context.view_layer.layer_collection.children[main_collection.name].children[collection.name]
+        bpy.context.view_layer.active_layer_collection = layer_collection
+        nodes = np.stack((object['span'][:,0], -object['span'][:,2], object['span'][:,1] ), axis = -1)
+        ob, mesh = create_quadrilateral(nodes*10**-3, str(i))
+        #bpy.context.collection.objects.unlink(ob)
+        #collection.objects.link(ob)                # Link object to collection
         ob.active_material = mat
-        set_mat_keys(mat,object['facecolor'])
 
     elif object['type']=='BoxLine':
-        ob = make_line(object['span']*10**-3, str(i), r=object['linewidth']*10**-3)
-        collection.objects.link(ob)                # Link object to collection
-        bpy.context.collection.objects.unlink(ob)
-        mat = bpy.data.materials.new(str(i))
-        mat.diffuse_color = object['meshcolor']
-        mat.use_nodes=True
+        #collection.objects.link(ob)                # Link object to collection
+        #bpy.context.collection.objects.unlink(ob)
+        mat_str = str(object['meshcolor'])
+        if not mat_str in mat_dict_line.keys():
+            mat = bpy.data.materials.new(str(i))
+            mat.diffuse_color = object['meshcolor']
+            mat.use_nodes=True
+            mat_dict_line[mat_str] = mat
+            set_mat_keys(mat,object['meshcolor'])
+        else:
+            mat = mat_dict_line[mat_str]
+        col_str = 'line'+mat_str+str(i//10000)
+        if not col_str in collection_dict.keys():
+            collection = bpy.data.collections.new("lines_"+str(i))
+            main_collection.children.link(collection)  # Link collection to scene
+            collection_dict[col_str] = collection
+        else:
+            collection = collection_dict[col_str]
+
+        layer_collection = bpy.context.view_layer.layer_collection.children[main_collection.name].children[collection.name]
+        bpy.context.view_layer.active_layer_collection = layer_collection
+        nodes = np.stack((object['span'][:,0], -object['span'][:,2], object['span'][:,1] ), axis = -1)
+        ob = make_line(nodes*10**-3, str(i), r=object['linewidth']*10**-3)
+        #collection.objects.link(ob)                # Link object to collection
         ob.active_material = mat
-        set_mat_keys(mat,object['meshcolor'])
 
     else:
-        print(object['type'])
+        ...#print(object['type'])
+bpy.data.meshes.remove(cyl)

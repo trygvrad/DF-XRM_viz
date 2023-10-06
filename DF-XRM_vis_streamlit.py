@@ -14,6 +14,7 @@ from libs import draw_crystal_structures
 from libs import three_d_draw
 from libs import optics_geometry
 from libs import orientation_helpers
+from libs import save_blender
 def get_binary_file_downloader_html(bin_file, file_label='File'):
     '''
     provides a link to a file that can be downloaded
@@ -300,10 +301,10 @@ if uploaded_file is not None or crystal != 'Upload':
     crystal_scale = 600.0
     crystal_axes_shift = [-5,-3,-5]
     crysta_structure_position = [-7000, -1000, 6000]
-    cage_list = ['Ti', 'Nb']
+    cage_list = ['Zr']
     oxygen_cage_radius = 2.5
     make_bonds = ['C','C']
-    max_bond_length = 2.5
+    max_bond_length = 2
     min_bond_length = 0
     show_text = True
     lens_scale = 1.0
@@ -359,7 +360,7 @@ if uploaded_file is not None or crystal != 'Upload':
                 #atom_legend_step = Q/np.sqrt(np.sum(Q**2)),
                 )
 
-    drawing, fig, ax, outstr = three_d_draw.make_3d_perspective(params,
+    drawing, fig, ax, outstr, three_d_objects = three_d_draw.make_3d_perspective(params,
                 export_blender_filepath = 'DF_XRM_vis_to_blender.pickled',
                 crystal_rotation_function = crystal_rotation_function,
                 scale = scale,
@@ -503,6 +504,22 @@ if uploaded_file is not None or crystal != 'Upload':
 
     st.markdown(get_binary_file_downloader_html('DF_XRM_vis_to_blender.pickled', 'pickled 3d structure for blender'), unsafe_allow_html=True)
     st.markdown(get_binary_file_downloader_html('assets/blender_import_script.py', 'blender import script'), unsafe_allow_html=True)
+
+    make_blend = st.checkbox("Direct blender export (experimental)")
+    if make_blend:
+        if 0:
+            '''
+            This must run in separate process because bpy does not support threading
+            and streamlit is multithreaded.
+            Use 'just_save.py' if to debug `save_blender.save_blend()`.
+            '''
+        from multiprocessing import Process
+        proc = Process(target=save_blender.save_blend, args=(three_d_objects, 'export.blend'))
+
+        proc.start()
+        proc.join()
+        #save_blender.save_blend(three_d_objects, 'export.blend')
+        st.markdown(get_binary_file_downloader_html('export.blend', 'export.blend'), unsafe_allow_html=True)
 
 
 st.markdown('---')

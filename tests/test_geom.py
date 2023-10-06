@@ -217,7 +217,7 @@ def test_geometry():
                 #atom_legend_step = Q/np.sqrt(np.sum(Q**2)),
                 )
 
-    drawing, fig, ax, outstr = three_d_draw.make_3d_perspective(params,
+    drawing, fig, ax, outstr, _ = three_d_draw.make_3d_perspective(params,
                 export_blender_filepath = 'DF_XRM_vis_to_blender.pickled',
                 crystal_rotation_function = crystal_rotation_function,
                 scale = scale,

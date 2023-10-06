@@ -263,10 +263,15 @@ def make_3d_perspective(params, export_blender_filepath=None,
             width = 1100,
             )
 
-    if not type(export_blender_filepath) == type(None):
-        drawing.export_blender(export_blender_filepath)
 
-    return drawing, fig, ax, outstr
+    top_level_list = []
+    for obj in drawing.objects:
+        top_level_list.append(obj.to_dict())
+    if not type(export_blender_filepath) == type(None):
+        import pickle
+        pickle.dump(top_level_list, open( export_blender_filepath, "wb" ))
+
+    return drawing, fig, ax, outstr, top_level_list
 
 
 
@@ -428,22 +433,6 @@ class Drawing:
         self.objects.append(mesh)
 
         return mesh
-
-
-
-    def export_blender(self, filepath):
-        '''
-        exports a list of all objects using pickle. Each object is a dictionary. This can be loaded into blender using an appropriate module
-        iput:
-            filepath: pickle file to store output
-        returns:
-            None
-        '''
-        top_level_list = []
-        for obj in self.objects:
-            top_level_list.append(obj.to_dict())
-        import pickle
-        pickle.dump(top_level_list, open( filepath, "wb" ))
 
     def add_lens(self, radius = 30, num_links = 4,
                 r_curvature = 100, facing = np.array([1.0, 1.0, 1.0]),
