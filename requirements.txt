@@ -15,4 +15,3 @@ toml==0.10.2
 sqlalchemy==2.0.1
 bpy==3.6.0
 mathutils==3.3.0
-multiprocessing==2.6.2.1
