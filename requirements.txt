@@ -13,5 +13,5 @@ wheel==0.38.4
 fpdf==1.7.2
 toml==0.10.2
 sqlalchemy==2.0.1
-bpy==3.6.0
 mathutils==3.3.0
+https://download.blender.org/pypi/bpy/bpy-3.6.0-cp310-cp310-manylinux_2_28_x86_64.whl
